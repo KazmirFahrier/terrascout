@@ -2,7 +2,7 @@
 
 TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a GPS-degraded orchard. It was scoped for a short creator-challenge build: make the rover actually move, inspect rows, avoid obvious hazards, emit metrics, and leave a clean path for deeper robotics modules later.
 
-![TerraScout orchard trace](docs/mission_trace.png)
+![TerraScout orchard inspection animation](docs/mission_trace.gif)
 
 ## What Works Today
 
@@ -16,6 +16,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Grid A* path planning over inflated tree and worker obstacles.
 - Value-iteration inspection scheduler over row-goal priority and travel cost.
 - End-to-end row-inspection mission runner with deterministic metrics.
+- Static PNG and animated GIF rendering for mission traces.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
 
 This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The current mission runner still uses ground-truth pose for closed-loop control and a grid planner for routing; full EKF-SLAM and Hybrid A* are on the roadmap.
@@ -28,7 +29,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.json
-python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png
+python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
 python benchmarks/run_benchmark.py
 python -m pytest
 ```
