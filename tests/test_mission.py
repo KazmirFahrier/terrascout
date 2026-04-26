@@ -11,6 +11,8 @@ class MissionTest(unittest.TestCase):
 
         self.assertEqual(metrics.inspected_rows, metrics.total_rows)
         self.assertEqual(metrics.collisions, 0)
+        self.assertGreater(metrics.mapped_landmarks, 50)
+        self.assertLess(metrics.mean_localization_error_m, 0.5)
         self.assertLess(metrics.wall_time_s, 5.0)
 
 

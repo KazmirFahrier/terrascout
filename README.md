@@ -11,11 +11,14 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Twin-loop PID waypoint tracking.
 - Lidar-style noisy cluster detections for trees and workers.
 - Constant-velocity Kalman tracking for moving worker detections.
+- Particle-filter localization against orchard tree landmarks from a coarse pose prior.
+- Online Gaussian tree-landmark mapping from local range/bearing detections.
 - Grid A* path planning over inflated tree and worker obstacles.
+- Value-iteration inspection scheduler over row-goal priority and travel cost.
 - End-to-end row-inspection mission runner with deterministic metrics.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
 
-This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The current mission runner uses ground-truth pose and a grid planner; localization, SLAM, and Hybrid A* are on the roadmap.
+This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The current mission runner still uses ground-truth pose for closed-loop control and a grid planner for routing; full EKF-SLAM and Hybrid A* are on the roadmap.
 
 ## Quick Start
 
@@ -40,9 +43,9 @@ python -m unittest discover -s tests
 
 Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
 
-| Seeds | Mean inspection success | Collision events | Mean wall time |
-| --- | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | 100% | 0 | ~0.34 s |
+| Seeds | Mean inspection success | Collision events | Mean localization error | Mean wall time |
+| --- | ---: | ---: | ---: | ---: |
+| 2, 3, 5, 7, 11 | 100% | 0 | ~0.19 m | ~2.0 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -53,7 +56,10 @@ terrascout/
   sim/        orchard world, rover kinematics, sensor detections
   control/    PID drive controller
   tracking/   Kalman worker tracker
+  localize/   particle-filter localization
+  mapping/    online tree-landmark mapper
   plan/       grid A* planner
+  scheduler/  value-iteration inspection scheduler
   runner/     end-to-end mission loop
   viz/        mission trace renderer
 ```
@@ -62,16 +68,19 @@ Runtime flow:
 
 1. The world emits noisy lidar-style detections.
 2. The Kalman tracker updates worker tracks and predicts near-future positions.
-3. The planner builds an inflated occupancy grid from trees and predicted workers.
-4. The PID controller tracks the next waypoint.
-5. The mission runner records row-inspection, collision, path-length, and timing metrics.
+3. The particle filter estimates rover pose from local tree observations.
+4. The landmark mapper accumulates a tree map from range/bearing detections.
+5. The scheduler chooses the next inspection goal from travel cost and row priority.
+6. The planner builds an inflated occupancy grid from trees and predicted workers.
+7. The PID controller tracks the next waypoint.
+8. The mission runner records inspection, collision, mapping, localization, path-length, and timing metrics.
 
 ## Roadmap
 
-- Replace ground-truth pose with Monte-Carlo localization against the orchard map.
-- Add tree-trunk landmark extraction and EKF-SLAM.
+- Use the particle-filter pose estimate directly in closed-loop control.
+- Replace the lightweight landmark mapper with EKF-SLAM.
 - Replace grid A* with Hybrid A* over `(x, y, theta)`.
-- Add a row scheduler based on battery/time/priority state.
+- Extend the scheduler with battery/time/priority state.
 - Generate animated GIFs for challenge/demo submissions.
 - Expand tests into coverage-gated CI.
 

@@ -43,6 +43,15 @@ class LidarDetection:
     kind: str
 
 
+@dataclass(frozen=True)
+class LocalLidarDetection:
+    """A range/bearing lidar detection in the rover frame."""
+
+    range_m: float
+    bearing_rad: float
+    kind: str
+
+
 class OrchardWorld:
     """Synthetic orchard with tree landmarks, row goals, and moving workers."""
 
@@ -141,6 +150,25 @@ class OrchardWorld:
                     detections.append(self._noisy_detection(worker.position, "worker", sigma=0.045))
         return detections
 
+    def local_lidar_detections(
+        self,
+        pose: Pose2D,
+        include_trees: bool = True,
+        include_workers: bool = True,
+    ) -> list[LocalLidarDetection]:
+        """Return noisy range/bearing detections in the rover frame."""
+
+        detections: list[LocalLidarDetection] = []
+        if include_trees:
+            for tree in self.trees:
+                if self._visible(pose, tree):
+                    detections.append(self._local_detection(pose, tree, "tree"))
+        if include_workers:
+            for worker in self.workers:
+                if self._visible(pose, worker.position):
+                    detections.append(self._local_detection(pose, worker.position, "worker"))
+        return detections
+
     def _visible(self, pose: Pose2D, point: Point2D) -> bool:
         dx = point.x - pose.x
         dy = point.y - pose.y
@@ -153,6 +181,17 @@ class OrchardWorld:
     def _noisy_detection(self, point: Point2D, kind: str, sigma: float) -> LidarDetection:
         noise = self.rng.normal(0.0, sigma, size=2)
         return LidarDetection(x=point.x + float(noise[0]), y=point.y + float(noise[1]), kind=kind)
+
+    def _local_detection(self, pose: Pose2D, point: Point2D, kind: str) -> LocalLidarDetection:
+        dx = point.x - pose.x
+        dy = point.y - pose.y
+        range_noise = float(self.rng.normal(0.0, 0.02))
+        bearing_noise = float(self.rng.normal(0.0, radians(0.4)))
+        return LocalLidarDetection(
+            range_m=max(0.0, hypot(dx, dy) + range_noise),
+            bearing_rad=atan2(dy, dx) - pose.theta + bearing_noise,
+            kind=kind,
+        )
 
     def collision_with_worker(self, pose: Pose2D, rover_radius_m: float = 0.45) -> bool:
         """Return true when the rover body intersects a worker."""

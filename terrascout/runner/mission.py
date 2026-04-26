@@ -10,7 +10,10 @@ from pathlib import Path
 from time import perf_counter
 
 from terrascout.control.pid import DriveController
+from terrascout.localize.particle import ParticleLocalizer
+from terrascout.mapping.landmarks import LandmarkMapper
 from terrascout.plan.astar import GridAStarPlanner
+from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D, distance
 from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.world import OrchardWorld, ScenarioConfig
@@ -30,6 +33,8 @@ class MissionMetrics:
     mission_time_s: float
     wall_time_s: float
     tracker_count: int
+    mapped_landmarks: int
+    mean_localization_error_m: float
     replans: int
 
 
@@ -65,9 +70,18 @@ def run_mission(
     rover = DifferentialDriveRover(pose=Pose2D(x=1.0, y=0.8, theta=1.25), slip_fraction=0.04)
     controller = DriveController.default()
     tracker = MultiObjectTracker()
+    mapper = LandmarkMapper()
+    localizer = ParticleLocalizer.gaussian(
+        500,
+        mean=Pose2D(x=rover.pose.x + 0.25, y=rover.pose.y - 0.2, theta=rover.pose.theta + 0.08),
+        std=(0.35, 0.35, 0.18),
+        seed=seed + 101,
+    )
     planner = GridAStarPlanner(world)
 
-    goals = world.row_goals
+    scheduler = InspectionScheduler()
+    ordered_goal_indices = scheduler.plan_order(rover.pose, world.row_goals)
+    goals = [world.row_goals[idx] for idx in ordered_goal_indices]
     current_goal_idx = 0
     current_path: list[Point2D] = []
     current_waypoint_idx = 0
@@ -76,12 +90,21 @@ def run_mission(
     inspected: set[int] = set()
     path_length_m = 0.0
     previous_pose = rover.pose
+    localization_error_sum = 0.0
+    localization_error_count = 0
 
     trace = MissionTrace(poses=[], goals=[(goal.x, goal.y) for goal in goals], workers=[])
 
     for step in range(max_steps):
         detections = world.lidar_detections(rover.pose, include_workers=True, include_trees=True)
+        local_detections = world.local_lidar_detections(rover.pose, include_workers=True, include_trees=True)
         tracker.update(detections, dt)
+        if step % 2 == 0:
+            mapper.update(rover.pose, local_detections)
+        if step % 5 == 0:
+            localizer.update(local_detections, world.trees)
+        localization_error_sum += distance(localizer.estimate(), rover.pose)
+        localization_error_count += 1
 
         if current_goal_idx >= len(goals):
             break
@@ -109,6 +132,11 @@ def run_mission(
         else:
             left, right = controller.wheel_commands(rover.pose, waypoint, dt)
         rover.command(left, right)
+        localizer.predict(
+            linear_mps=0.5 * (left + right),
+            angular_rps=(right - left) / rover.wheel_base_m,
+            dt=dt,
+        )
         pose = rover.step(dt)
         world.step_workers(dt)
 
@@ -135,12 +163,16 @@ def run_mission(
         seed=seed,
         inspected_rows=len(inspected),
         total_rows=len(goals),
-        success_rate=len(inspected) / len(goals),
+        success_rate=len(inspected) / len(goals) if goals else 1.0,
         collisions=collisions,
         path_length_m=path_length_m,
         mission_time_s=mission_time_s,
         wall_time_s=perf_counter() - started,
         tracker_count=len(tracker.tracks),
+        mapped_landmarks=len(mapper.landmarks),
+        mean_localization_error_m=(
+            localization_error_sum / localization_error_count if localization_error_count else 0.0
+        ),
         replans=replans,
     )
     if trace_path is not None:
