@@ -11,6 +11,7 @@ from time import perf_counter
 
 from terrascout.control.pid import DriveController
 from terrascout.localize.particle import ParticleLocalizer
+from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.mapping.landmarks import LandmarkMapper
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
@@ -35,6 +36,8 @@ class MissionMetrics:
     wall_time_s: float
     tracker_count: int
     mapped_landmarks: int
+    slam_landmarks: int
+    slam_covariance_trace: float
     mean_localization_error_m: float
     planner: str
     replans: int
@@ -74,6 +77,7 @@ def run_mission(
     controller = DriveController.default()
     tracker = MultiObjectTracker()
     mapper = LandmarkMapper()
+    slam = EkfSlam(rover.pose)
     localizer = ParticleLocalizer.gaussian(
         500,
         mean=Pose2D(x=rover.pose.x + 0.25, y=rover.pose.y - 0.2, theta=rover.pose.theta + 0.08),
@@ -107,6 +111,7 @@ def run_mission(
             mapper.update(rover.pose, local_detections)
         if step % 5 == 0:
             localizer.update(local_detections, world.trees)
+            slam.update(local_detections)
         localization_error_sum += distance(localizer.estimate(), rover.pose)
         localization_error_count += 1
 
@@ -149,6 +154,11 @@ def run_mission(
             angular_rps=(right - left) / rover.wheel_base_m,
             dt=dt,
         )
+        slam.predict(
+            linear_mps=0.5 * (left + right),
+            angular_rps=(right - left) / rover.wheel_base_m,
+            dt=dt,
+        )
         pose = rover.step(dt)
         world.step_workers(dt)
 
@@ -182,6 +192,8 @@ def run_mission(
         wall_time_s=perf_counter() - started,
         tracker_count=len(tracker.tracks),
         mapped_landmarks=len(mapper.landmarks),
+        slam_landmarks=slam.landmark_count,
+        slam_covariance_trace=float(slam.covariance.trace()),
         mean_localization_error_m=(
             localization_error_sum / localization_error_count if localization_error_count else 0.0
         ),

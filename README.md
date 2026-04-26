@@ -51,7 +51,7 @@ Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspect
 
 | Seeds | Mean inspection success | Collision events | Mean localization error | Mean wall time |
 | --- | ---: | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | 100% | 0 | ~0.19 m | ~2.0 s |
+| 2, 3, 5, 7, 11 | 100% | 0 | ~0.19 m | ~3.0 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -83,12 +83,12 @@ Runtime flow:
 5. The scheduler chooses the next inspection goal from travel cost and row priority.
 6. The planner builds an inflated occupancy grid from trees and predicted workers.
 7. The PID controller tracks the next waypoint.
-8. The mission runner records inspection, collision, mapping, localization, path-length, and timing metrics.
+8. The mission runner records inspection, collision, mapping, EKF-SLAM, localization, path-length, and timing metrics.
 
 ## Roadmap
 
 - Use the particle-filter pose estimate directly in closed-loop control.
-- Integrate EKF-SLAM into the end-to-end mission runner.
+- Use EKF-SLAM estimates directly in closed-loop planning and control.
 - Use Hybrid A* as the default mission planner after more stress testing.
 - Extend the scheduler with battery/time/priority state.
 - Expand tests into coverage-gated CI.
