@@ -14,12 +14,13 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Particle-filter localization against orchard tree landmarks from a coarse pose prior.
 - Online Gaussian tree-landmark mapping from local range/bearing detections.
 - Grid A* path planning over inflated tree and worker obstacles.
+- Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives.
 - Value-iteration inspection scheduler over row-goal priority and travel cost.
 - End-to-end row-inspection mission runner with deterministic metrics.
 - Static PNG and animated GIF rendering for mission traces.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
 
-This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The current mission runner still uses ground-truth pose for closed-loop control and a grid planner for routing; full EKF-SLAM and Hybrid A* are on the roadmap.
+This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The current mission runner still uses ground-truth pose for closed-loop control and grid A* for its default routing path; full EKF-SLAM and richer closed-loop uncertainty handling are on the roadmap. Hybrid A* is available with `--planner hybrid`.
 
 ## Quick Start
 
@@ -29,8 +30,10 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.json
+python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/hybrid_trace.json
 python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
 python benchmarks/run_benchmark.py
+python benchmarks/planner_benchmark.py
 python -m pytest
 ```
 
@@ -50,6 +53,8 @@ Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspect
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
+Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* averaged ~55 ms per plan while returning sparse heading-aware pose paths.
+
 ## Architecture
 
 ```text
@@ -59,7 +64,7 @@ terrascout/
   tracking/   Kalman worker tracker
   localize/   particle-filter localization
   mapping/    online tree-landmark mapper
-  plan/       grid A* planner
+  plan/       grid A* and Hybrid A* planners
   scheduler/  value-iteration inspection scheduler
   runner/     end-to-end mission loop
   viz/        mission trace renderer
@@ -80,9 +85,8 @@ Runtime flow:
 
 - Use the particle-filter pose estimate directly in closed-loop control.
 - Replace the lightweight landmark mapper with EKF-SLAM.
-- Replace grid A* with Hybrid A* over `(x, y, theta)`.
+- Use Hybrid A* as the default mission planner after more stress testing.
 - Extend the scheduler with battery/time/priority state.
-- Generate animated GIFs for challenge/demo submissions.
 - Expand tests into coverage-gated CI.
 
 ## Why This Exists

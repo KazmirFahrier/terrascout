@@ -13,6 +13,15 @@ class MissionTest(unittest.TestCase):
         self.assertEqual(metrics.collisions, 0)
         self.assertGreater(metrics.mapped_landmarks, 50)
         self.assertLess(metrics.mean_localization_error_m, 0.5)
+        self.assertEqual(metrics.planner, "grid")
+        self.assertLess(metrics.wall_time_s, 5.0)
+
+    def test_hybrid_planner_mission_completes(self) -> None:
+        metrics = run_mission(seed=7, planner_kind="hybrid")
+
+        self.assertEqual(metrics.inspected_rows, metrics.total_rows)
+        self.assertEqual(metrics.collisions, 0)
+        self.assertEqual(metrics.planner, "hybrid")
         self.assertLess(metrics.wall_time_s, 5.0)
 
 

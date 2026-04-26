@@ -13,6 +13,7 @@ from terrascout.control.pid import DriveController
 from terrascout.localize.particle import ParticleLocalizer
 from terrascout.mapping.landmarks import LandmarkMapper
 from terrascout.plan.astar import GridAStarPlanner
+from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D, distance
 from terrascout.sim.rover import DifferentialDriveRover
@@ -35,6 +36,7 @@ class MissionMetrics:
     tracker_count: int
     mapped_landmarks: int
     mean_localization_error_m: float
+    planner: str
     replans: int
 
 
@@ -54,6 +56,7 @@ def run_mission(
     worker_count: int = 1,
     max_steps: int = 4200,
     dt: float = 0.05,
+    planner_kind: str = "grid",
     trace_path: Path | None = None,
 ) -> MissionMetrics:
     """Run a complete deterministic orchard-inspection mission."""
@@ -77,7 +80,8 @@ def run_mission(
         std=(0.35, 0.35, 0.18),
         seed=seed + 101,
     )
-    planner = GridAStarPlanner(world)
+    grid_planner = GridAStarPlanner(world)
+    hybrid_planner = HybridAStarPlanner(world)
 
     scheduler = InspectionScheduler()
     ordered_goal_indices = scheduler.plan_order(rover.pose, world.row_goals)
@@ -110,11 +114,19 @@ def run_mission(
             break
         goal = goals[current_goal_idx]
         if not current_path or current_waypoint_idx >= len(current_path) or step % 100 == 0:
-            current_path = planner.plan(
-                rover.pose,
-                goal,
-                predicted_workers=tracker.predicted_positions(horizon_s=1.0),
-            )
+            if planner_kind == "hybrid":
+                hybrid_path = hybrid_planner.plan(
+                    rover.pose,
+                    Pose2D(goal.x, goal.y, 0.0),
+                    predicted_workers=tracker.predicted_positions(horizon_s=1.0),
+                )
+                current_path = [Point2D(pose.x, pose.y) for pose in hybrid_path]
+            else:
+                current_path = grid_planner.plan(
+                    rover.pose,
+                    goal,
+                    predicted_workers=tracker.predicted_positions(horizon_s=1.0),
+                )
             current_waypoint_idx = 0
             replans += 1
 
@@ -173,6 +185,7 @@ def run_mission(
         mean_localization_error_m=(
             localization_error_sum / localization_error_count if localization_error_count else 0.0
         ),
+        planner=planner_kind,
         replans=replans,
     )
     if trace_path is not None:
@@ -198,6 +211,7 @@ def main() -> None:
     parser.add_argument("--rows", type=int, default=8)
     parser.add_argument("--trees-per-row", type=int, default=14)
     parser.add_argument("--workers", type=int, default=1)
+    parser.add_argument("--planner", choices=["grid", "hybrid"], default="grid")
     parser.add_argument("--trace", type=Path, default=Path("artifacts/mission_trace.json"))
     parser.add_argument("--csv", type=Path, default=None)
     args = parser.parse_args()
@@ -207,6 +221,7 @@ def main() -> None:
         rows=args.rows,
         trees_per_row=args.trees_per_row,
         worker_count=args.workers,
+        planner_kind=args.planner,
         trace_path=args.trace,
     )
     print(json.dumps(asdict(metrics), indent=2))
