@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "terrascout"
+version = "0.1.0"
+description = "A compact autonomy demo for a crop-inspection rover in GPS-degraded orchards."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Kazmir Fahrier" }]
+dependencies = [
+  "numpy>=1.26",
+  "matplotlib>=3.8",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.5",
+  "mypy>=1.10",
+]
+
+[project.scripts]
+terrascout-demo = "terrascout.runner.mission:main"
+terrascout-render = "terrascout.viz.render:main"
+
+[tool.setuptools.packages.find]
+include = ["terrascout*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.mypy]
+python_version = "3.9"
+strict = true
+packages = ["terrascout"]
