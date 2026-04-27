@@ -60,12 +60,12 @@ V(mask, pos) = max_a R(mask, pos, a) + gamma * V(mask | (1 << a), a)
 Iteration continues until the maximum value change is below tolerance or the maximum iteration
 count is reached. The policy table stores the best action for each `(mask, pos)` state.
 
-## Resource-Aware Search
+## Resource-Aware Pareto Search
 
-The resource-aware planner memoizes:
+The resource-aware planner keeps Pareto-optimal labels for each `(visited_mask, position)` state:
 
 ```text
-search(mask, pos, battery_bin, time_bin) -> (value, order)
+label = [discounted_value_so_far, battery_remaining, time_remaining, order]
 ```
 
 For each action:
@@ -75,8 +75,12 @@ travel_m = distance(pos, action)
 travel_s = travel_m / nominal_speed + service_time
 ```
 
-If feasible, the search recurses into the next mask and resource bins. The highest value order is
-returned along with remaining battery and time.
+If feasible, the planner creates a new label for the next mask, position, and exact remaining
+resources. A candidate label is discarded when an existing label at the same state has greater or
+equal value, battery, and time. Existing labels dominated by the candidate are removed. The final
+plan is the label with the best discounted value plus terminal dropped-goal penalty. This keeps
+the search exact for the benchmarked problem size without the optimality loss of coarse resource
+bins.
 
 ## Pseudocode
 
@@ -90,14 +94,22 @@ function plan_order(start, goals, priorities):
     roll out policy from empty mask
 
 function plan_with_resources(start, goals, priorities, battery, daylight):
-    return memoized_search(mask=0, pos=start, battery_bin, time_bin)
+    labels[(0, start)] = initial label
+    while frontier is not empty:
+        label = pop frontier
+        for feasible unvisited action:
+            next_label = advance resources and discounted value
+            if next_label is not dominated:
+                add it to labels and frontier
+    return label with best value plus terminal dropped-goal penalty
 ```
 
 ## Acceptance Evidence
 
 The scheduler benchmark compares the MDP order against a brute-force permutation oracle for a
-deterministic 7-goal problem. Current tests require an optimality gap near zero and sub-second
-wall time.
+deterministic 7-goal problem. The resource scheduler benchmark compares battery/daylight
+constrained plans against an exact constrained oracle across 50 randomized 8-goal layouts. Current
+tests require an optimality gap near zero and sub-second scheduler wall time.
 
 ## References
 

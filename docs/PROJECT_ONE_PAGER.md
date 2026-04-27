@@ -32,6 +32,7 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | 10-worker association accuracy | 100% on deterministic benchmark |
 | Particle-filter relocalization | <0.03 m p95 from +/-5 m, +/-30 degree prior |
 | Scheduler oracle gap | 0% on deterministic 7-goal benchmark |
+| Resource scheduler oracle gap | 0% across 50 constrained randomized layouts |
 | Hybrid A* steering effort | >80% lower than grid A* baseline |
 | EKF-SLAM map accuracy | <0.10 m mean landmark error on deterministic traversal |
 | Mean localization error | ~0.19 m |
@@ -68,6 +69,7 @@ python benchmarks/control_benchmark.py
 python benchmarks/tracking_benchmark.py
 python benchmarks/localization_benchmark.py
 python benchmarks/scheduler_benchmark.py
+python benchmarks/resource_scheduler_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
 python benchmarks/end_to_end_benchmark.py

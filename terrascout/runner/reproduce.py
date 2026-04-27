@@ -13,6 +13,7 @@ from terrascout.eval.benchmarks import (
     EndToEndBenchmarkRow,
     LocalizationBenchmarkRow,
     PlannerBenchmarkRow,
+    ResourceSchedulerBenchmarkRow,
     SchedulerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
@@ -22,6 +23,7 @@ from terrascout.eval.benchmarks import (
     run_end_to_end_benchmark,
     run_localization_benchmark,
     run_planner_benchmark,
+    run_resource_scheduler_benchmark,
     run_scheduler_benchmark,
     run_slam_benchmark,
     run_stress_benchmark,
@@ -61,6 +63,9 @@ def run_reproduce(
     tracking_rows = run_tracking_benchmark(artifacts_dir / "tracking_benchmark.csv")
     localization_rows = run_localization_benchmark(artifacts_dir / "localization_benchmark.csv")
     scheduler_rows = run_scheduler_benchmark(artifacts_dir / "scheduler_benchmark.csv")
+    resource_scheduler_rows = run_resource_scheduler_benchmark(
+        artifacts_dir / "resource_scheduler_benchmark.csv"
+    )
     planner_rows = run_planner_benchmark(artifacts_dir / "planner_benchmark.csv")
     slam_rows = run_slam_benchmark(artifacts_dir / "slam_benchmark.csv")
     end_to_end_rows = run_end_to_end_benchmark(artifacts_dir / "end_to_end_benchmark.csv")
@@ -77,6 +82,7 @@ def run_reproduce(
         tracking_rows=tracking_rows,
         localization_rows=localization_rows,
         scheduler_rows=scheduler_rows,
+        resource_scheduler_rows=resource_scheduler_rows,
         planner_rows=planner_rows,
         slam_rows=slam_rows,
         end_to_end_rows=end_to_end_rows,
@@ -97,6 +103,7 @@ def build_reproduce_summary(
     tracking_rows: list[TrackingBenchmarkRow],
     localization_rows: list[LocalizationBenchmarkRow],
     scheduler_rows: list[SchedulerBenchmarkRow],
+    resource_scheduler_rows: list[ResourceSchedulerBenchmarkRow],
     planner_rows: list[PlannerBenchmarkRow],
     slam_rows: list[SlamBenchmarkRow],
     end_to_end_rows: list[EndToEndBenchmarkRow],
@@ -151,6 +158,15 @@ def build_reproduce_summary(
             ),
             "scheduler_max_wall_time_ms": max(
                 (row.wall_time_ms for row in scheduler_rows),
+                default=0.0,
+            ),
+            "resource_scheduler_layouts": len(resource_scheduler_rows),
+            "resource_scheduler_max_optimality_gap_percent": max(
+                (row.optimality_gap_percent for row in resource_scheduler_rows),
+                default=0.0,
+            ),
+            "resource_scheduler_max_wall_time_ms": max(
+                (row.wall_time_ms for row in resource_scheduler_rows),
                 default=0.0,
             ),
             "planner_mean_wall_time_ms": {

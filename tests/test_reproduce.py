@@ -8,6 +8,7 @@ from terrascout.eval.benchmarks import (
     EndToEndBenchmarkRow,
     LocalizationBenchmarkRow,
     PlannerBenchmarkRow,
+    ResourceSchedulerBenchmarkRow,
     SchedulerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
@@ -56,6 +57,9 @@ class ReproduceSummaryTest(unittest.TestCase):
             tracking_rows=[TrackingBenchmarkRow(7, 10, 10, 0.04, 1.0, 2.0)],
             localization_rows=[LocalizationBenchmarkRow(7, 0.5, 5.0, 0.12, 1350, 4.0)],
             scheduler_rows=[SchedulerBenchmarkRow(7, 7, 10.0, 10.0, 0.0, 8, 5.0)],
+            resource_scheduler_rows=[
+                ResourceSchedulerBenchmarkRow(7, 8, 6, 18.0, 18.0, 0.0, 50.0, 60.0, 120, 6.0)
+            ],
             planner_rows=[
                 PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 10.0, 8.0),
                 PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 4.0, 55.0),
@@ -77,6 +81,11 @@ class ReproduceSummaryTest(unittest.TestCase):
         self.assertEqual(summary["benchmark_summary"]["localization_max_prior_position_error_m"], 0.5)
         self.assertEqual(summary["benchmark_summary"]["localization_max_prior_heading_error_deg"], 5.0)
         self.assertEqual(summary["benchmark_summary"]["scheduler_max_optimality_gap_percent"], 0.0)
+        self.assertEqual(summary["benchmark_summary"]["resource_scheduler_layouts"], 1)
+        self.assertEqual(
+            summary["benchmark_summary"]["resource_scheduler_max_optimality_gap_percent"],
+            0.0,
+        )
         self.assertEqual(
             summary["benchmark_summary"]["planner_mean_wall_time_ms"]["hybrid_astar"],
             55.0,

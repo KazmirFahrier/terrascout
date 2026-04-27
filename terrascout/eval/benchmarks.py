@@ -19,7 +19,7 @@ from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.runner.mission import MissionMetrics, run_mission, write_metrics_csv
-from terrascout.scheduler.value_iteration import InspectionScheduler
+from terrascout.scheduler.value_iteration import InspectionScheduler, SchedulerConfig
 from terrascout.sim.geometry import Point2D, Pose2D, distance, wrap_angle
 from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.world import LidarDetection, OrchardWorld, ScenarioConfig
@@ -85,6 +85,20 @@ class SchedulerBenchmarkRow:
     scheduler_value: float
     oracle_value: float
     optimality_gap_percent: float
+    iterations: int
+    wall_time_ms: float
+
+
+@dataclass(frozen=True)
+class ResourceSchedulerBenchmarkRow:
+    seed: int
+    goal_count: int
+    inspected_goals: int
+    scheduler_value: float
+    oracle_value: float
+    optimality_gap_percent: float
+    battery_budget_m: float
+    daylight_budget_s: float
     iterations: int
     wall_time_ms: float
 
@@ -437,6 +451,60 @@ def run_scheduler_benchmark(
     return rows
 
 
+def run_resource_scheduler_benchmark(
+    output: Path = Path("artifacts/resource_scheduler_benchmark.csv"),
+    seeds: Sequence[int] | None = None,
+    goal_count: int = 8,
+) -> list[ResourceSchedulerBenchmarkRow]:
+    """Compare resource-aware scheduling against an exact constrained oracle."""
+
+    rows: list[ResourceSchedulerBenchmarkRow] = []
+    start = Pose2D(0.0, 0.0, 0.0)
+    benchmark_seeds = list(seeds or range(50))
+    for seed in benchmark_seeds:
+        rng = np.random.default_rng(seed)
+        goals = _random_scheduler_goals(rng, goal_count, max_x=25.0, max_y=25.0)
+        priorities = [float(rng.uniform(0.7, 1.8)) for _ in goals]
+        battery_budget_m = float(rng.uniform(35.0, 65.0))
+        daylight_budget_s = float(rng.uniform(45.0, 85.0))
+        scheduler = InspectionScheduler()
+        started = perf_counter()
+        plan = scheduler.plan_with_resources(
+            start,
+            goals,
+            priorities,
+            battery_budget_m=battery_budget_m,
+            daylight_budget_s=daylight_budget_s,
+        )
+        wall_time_ms = (perf_counter() - started) * 1000.0
+        oracle_value = _resource_scheduler_oracle_value(
+            start,
+            goals,
+            priorities,
+            battery_budget_m,
+            daylight_budget_s,
+            scheduler.config,
+        )
+        gap = max(0.0, oracle_value - plan.expected_value) / max(1.0, abs(oracle_value)) * 100.0
+        rows.append(
+            ResourceSchedulerBenchmarkRow(
+                seed=seed,
+                goal_count=goal_count,
+                inspected_goals=len(plan.order),
+                scheduler_value=plan.expected_value,
+                oracle_value=oracle_value,
+                optimality_gap_percent=gap,
+                battery_budget_m=battery_budget_m,
+                daylight_budget_s=daylight_budget_s,
+                iterations=scheduler.iterations,
+                wall_time_ms=wall_time_ms,
+            )
+        )
+
+    _write_csv(rows, output)
+    return rows
+
+
 def run_stress_benchmark(
     seeds: Sequence[int] | None = None,
     scenarios: Sequence[StressScenario] | None = None,
@@ -671,11 +739,16 @@ def _mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
 
 
-def _random_scheduler_goals(rng: np.random.Generator, goal_count: int) -> list[Point2D]:
+def _random_scheduler_goals(
+    rng: np.random.Generator,
+    goal_count: int,
+    max_x: float = 20.0,
+    max_y: float = 18.0,
+) -> list[Point2D]:
     return [
         Point2D(
-            x=float(rng.uniform(2.0, 20.0)),
-            y=float(rng.uniform(0.0, 18.0)),
+            x=float(rng.uniform(2.0, max_x)),
+            y=float(rng.uniform(0.0, max_y)),
         )
         for _ in range(goal_count)
     ]
@@ -710,6 +783,61 @@ def _scheduler_oracle_value(
         _schedule_order_value(start, goals, priorities, order)
         for order in permutations(range(len(goals)))
     )
+
+
+def _resource_scheduler_oracle_value(
+    start: Pose2D,
+    goals: list[Point2D],
+    priorities: list[float],
+    battery_budget_m: float,
+    daylight_budget_s: float,
+    config: SchedulerConfig,
+) -> float:
+    best = -config.low_battery_penalty * len(goals)
+    for length in range(1, len(goals) + 1):
+        for order in permutations(range(len(goals)), length):
+            value = _resource_schedule_order_value(
+                start,
+                goals,
+                priorities,
+                order,
+                battery_budget_m,
+                daylight_budget_s,
+                config,
+            )
+            if value is not None and value > best:
+                best = value
+    return best
+
+
+def _resource_schedule_order_value(
+    start: Pose2D,
+    goals: list[Point2D],
+    priorities: list[float],
+    order: Sequence[int],
+    battery_budget_m: float,
+    daylight_budget_s: float,
+    config: SchedulerConfig,
+) -> float | None:
+    value = 0.0
+    position = len(goals)
+    battery_remaining = battery_budget_m
+    time_remaining = daylight_budget_s
+    for depth, action in enumerate(order):
+        origin_x = start.x if position == len(goals) else goals[position].x
+        origin_y = start.y if position == len(goals) else goals[position].y
+        travel_m = hypot(goals[action].x - origin_x, goals[action].y - origin_y)
+        travel_s = travel_m / config.nominal_speed_mps + config.service_time_s
+        if travel_m > battery_remaining + 1e-9 or travel_s > time_remaining + 1e-9:
+            return None
+        reward = config.inspection_reward * priorities[action] - config.travel_cost_per_m * travel_m
+        value += (config.discount**depth) * reward
+        battery_remaining -= travel_m
+        time_remaining -= travel_s
+        position = action
+    dropped_goals = len(goals) - len(order)
+    value += (config.discount ** len(order)) * (-config.low_battery_penalty * dropped_goals)
+    return value
 
 
 def percentile(values: Sequence[float], percentile_value: float) -> float:

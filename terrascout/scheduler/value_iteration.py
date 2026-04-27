@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import lru_cache
 from math import hypot
 
 import numpy as np
@@ -35,6 +34,14 @@ class SchedulePlan:
     battery_remaining_m: float
     time_remaining_s: float
     dropped_goals: int
+
+
+@dataclass(frozen=True)
+class _ResourceLabel:
+    value: float
+    battery_remaining_m: float
+    time_remaining_s: float
+    order: tuple[int, ...]
 
 
 class InspectionScheduler:
@@ -88,58 +95,87 @@ class InspectionScheduler:
         distances = self._distance_matrix(start, goals)
         n = len(goals)
         all_seen = (1 << n) - 1
-        battery_scale = max(1.0, battery_budget_m / 25.0)
-        time_scale = max(1.0, daylight_budget_s / 25.0)
+        labels: dict[tuple[int, int], list[_ResourceLabel]] = {
+            (0, n): [_ResourceLabel(0.0, battery_budget_m, daylight_budget_s, ())]
+        }
+        frontier: list[tuple[int, int, _ResourceLabel]] = [(0, n, labels[(0, n)][0])]
+        expanded = 0
 
-        @lru_cache(maxsize=None)
-        def search(mask: int, pos: int, battery_bin: int, time_bin: int) -> tuple[float, tuple[int, ...]]:
+        while frontier:
+            mask, pos, label = frontier.pop()
+            expanded += 1
             if mask == all_seen:
-                return 0.0, ()
-            battery_remaining = battery_bin * battery_scale
-            time_remaining = time_bin * time_scale
-            best_value = -self.config.low_battery_penalty * (n - bin(mask).count("1"))
-            best_order: tuple[int, ...] = ()
+                continue
+            depth = len(label.order)
             for action in range(n):
                 if mask & (1 << action):
                     continue
                 travel_m = float(distances[pos, action])
                 travel_s = travel_m / self.config.nominal_speed_mps + self.config.service_time_s
-                if travel_m > battery_remaining or travel_s > time_remaining:
+                if travel_m > label.battery_remaining_m or travel_s > label.time_remaining_s:
                     continue
-                next_battery = int((battery_remaining - travel_m) / battery_scale)
-                next_time = int((time_remaining - travel_s) / time_scale)
-                future_value, future_order = search(mask | (1 << action), action, next_battery, next_time)
                 reward = (
                     self.config.inspection_reward * priorities[action]
                     - self.config.travel_cost_per_m * travel_m
                 )
-                candidate = reward + self.config.discount * future_value
-                if candidate > best_value:
-                    best_value = candidate
-                    best_order = (action, *future_order)
-            return best_value, best_order
+                next_label = _ResourceLabel(
+                    value=label.value + (self.config.discount**depth) * reward,
+                    battery_remaining_m=label.battery_remaining_m - travel_m,
+                    time_remaining_s=label.time_remaining_s - travel_s,
+                    order=(*label.order, action),
+                )
+                next_key = (mask | (1 << action), action)
+                if self._add_pareto_label(labels.setdefault(next_key, []), next_label):
+                    frontier.append((next_key[0], next_key[1], next_label))
 
-        initial_battery_bin = int(battery_budget_m / battery_scale)
-        initial_time_bin = int(daylight_budget_s / time_scale)
-        value, order_tuple = search(0, n, initial_battery_bin, initial_time_bin)
-        order = list(order_tuple)
-
-        battery_remaining = battery_budget_m
-        time_remaining = daylight_budget_s
-        pos = n
-        for action in order:
-            travel_m = float(distances[pos, action])
-            battery_remaining -= travel_m
-            time_remaining -= travel_m / self.config.nominal_speed_mps + self.config.service_time_s
-            pos = action
+        self.iterations = expanded
+        best = _ResourceLabel(
+            value=-self.config.low_battery_penalty * n,
+            battery_remaining_m=battery_budget_m,
+            time_remaining_s=daylight_budget_s,
+            order=(),
+        )
+        best_total = best.value
+        for state_labels in labels.values():
+            for label in state_labels:
+                remaining = n - len(label.order)
+                terminal_value = (
+                    label.value
+                    + (self.config.discount ** len(label.order))
+                    * (-self.config.low_battery_penalty * remaining)
+                )
+                if terminal_value > best_total:
+                    best_total = terminal_value
+                    best = label
+        order = list(best.order)
 
         return SchedulePlan(
             order=order,
-            expected_value=value,
-            battery_remaining_m=max(0.0, battery_remaining),
-            time_remaining_s=max(0.0, time_remaining),
+            expected_value=best_total,
+            battery_remaining_m=max(0.0, best.battery_remaining_m),
+            time_remaining_s=max(0.0, best.time_remaining_s),
             dropped_goals=n - len(order),
         )
+
+    def _add_pareto_label(self, labels: list[_ResourceLabel], candidate: _ResourceLabel) -> bool:
+        for label in labels:
+            if (
+                label.value >= candidate.value
+                and label.battery_remaining_m >= candidate.battery_remaining_m
+                and label.time_remaining_s >= candidate.time_remaining_s
+            ):
+                return False
+        labels[:] = [
+            label
+            for label in labels
+            if not (
+                candidate.value >= label.value
+                and candidate.battery_remaining_m >= label.battery_remaining_m
+                and candidate.time_remaining_s >= label.time_remaining_s
+            )
+        ]
+        labels.append(candidate)
+        return True
 
     def _solve(
         self,
