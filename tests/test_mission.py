@@ -16,6 +16,9 @@ class MissionTest(unittest.TestCase):
         self.assertGreater(metrics.slam_covariance_trace, 0.0)
         self.assertLess(metrics.mean_localization_error_m, 0.5)
         self.assertEqual(metrics.planner, "grid")
+        self.assertEqual(metrics.scheduler_dropped_goals, 0)
+        self.assertGreater(metrics.battery_remaining_m, 0.0)
+        self.assertGreater(metrics.daylight_remaining_s, 0.0)
         self.assertLess(metrics.wall_time_s, 5.0)
 
     def test_hybrid_planner_mission_completes(self) -> None:

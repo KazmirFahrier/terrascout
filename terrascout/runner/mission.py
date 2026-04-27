@@ -40,6 +40,10 @@ class MissionMetrics:
     slam_covariance_trace: float
     mean_localization_error_m: float
     planner: str
+    scheduler_value: float
+    scheduler_dropped_goals: int
+    battery_remaining_m: float
+    daylight_remaining_s: float
     replans: int
 
 
@@ -88,7 +92,15 @@ def run_mission(
     hybrid_planner = HybridAStarPlanner(world)
 
     scheduler = InspectionScheduler()
-    ordered_goal_indices = scheduler.plan_order(rover.pose, world.row_goals)
+    priorities = [1.0 + 0.25 * (idx % 3) for idx in range(len(world.row_goals))]
+    schedule = scheduler.plan_with_resources(
+        rover.pose,
+        world.row_goals,
+        priorities=priorities,
+        battery_budget_m=140.0,
+        daylight_budget_s=180.0,
+    )
+    ordered_goal_indices = schedule.order
     goals = [world.row_goals[idx] for idx in ordered_goal_indices]
     current_goal_idx = 0
     current_path: list[Point2D] = []
@@ -198,6 +210,10 @@ def run_mission(
             localization_error_sum / localization_error_count if localization_error_count else 0.0
         ),
         planner=planner_kind,
+        scheduler_value=schedule.expected_value,
+        scheduler_dropped_goals=schedule.dropped_goals,
+        battery_remaining_m=schedule.battery_remaining_m,
+        daylight_remaining_s=schedule.time_remaining_s,
         replans=replans,
     )
     if trace_path is not None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from math import hypot
 
 import numpy as np
@@ -20,6 +21,20 @@ class SchedulerConfig:
     discount: float = 0.97
     tolerance: float = 1e-5
     max_iterations: int = 400
+    nominal_speed_mps: float = 1.0
+    service_time_s: float = 2.0
+    low_battery_penalty: float = 2.0
+
+
+@dataclass(frozen=True)
+class SchedulePlan:
+    """Resource-aware inspection schedule."""
+
+    order: list[int]
+    expected_value: float
+    battery_remaining_m: float
+    time_remaining_s: float
+    dropped_goals: int
 
 
 class InspectionScheduler:
@@ -56,6 +71,75 @@ class InspectionScheduler:
             mask |= 1 << action
             pos = action
         return order
+
+    def plan_with_resources(
+        self,
+        start: Pose2D,
+        goals: list[Point2D],
+        priorities: list[float] | None = None,
+        battery_budget_m: float = 140.0,
+        daylight_budget_s: float = 180.0,
+    ) -> SchedulePlan:
+        """Plan an inspection order while accounting for battery and daylight budgets."""
+
+        if not goals:
+            return SchedulePlan([], 0.0, battery_budget_m, daylight_budget_s, 0)
+        priorities = priorities or [1.0] * len(goals)
+        distances = self._distance_matrix(start, goals)
+        n = len(goals)
+        all_seen = (1 << n) - 1
+        battery_scale = max(1.0, battery_budget_m / 25.0)
+        time_scale = max(1.0, daylight_budget_s / 25.0)
+
+        @lru_cache(maxsize=None)
+        def search(mask: int, pos: int, battery_bin: int, time_bin: int) -> tuple[float, tuple[int, ...]]:
+            if mask == all_seen:
+                return 0.0, ()
+            battery_remaining = battery_bin * battery_scale
+            time_remaining = time_bin * time_scale
+            best_value = -self.config.low_battery_penalty * (n - bin(mask).count("1"))
+            best_order: tuple[int, ...] = ()
+            for action in range(n):
+                if mask & (1 << action):
+                    continue
+                travel_m = float(distances[pos, action])
+                travel_s = travel_m / self.config.nominal_speed_mps + self.config.service_time_s
+                if travel_m > battery_remaining or travel_s > time_remaining:
+                    continue
+                next_battery = int((battery_remaining - travel_m) / battery_scale)
+                next_time = int((time_remaining - travel_s) / time_scale)
+                future_value, future_order = search(mask | (1 << action), action, next_battery, next_time)
+                reward = (
+                    self.config.inspection_reward * priorities[action]
+                    - self.config.travel_cost_per_m * travel_m
+                )
+                candidate = reward + self.config.discount * future_value
+                if candidate > best_value:
+                    best_value = candidate
+                    best_order = (action, *future_order)
+            return best_value, best_order
+
+        initial_battery_bin = int(battery_budget_m / battery_scale)
+        initial_time_bin = int(daylight_budget_s / time_scale)
+        value, order_tuple = search(0, n, initial_battery_bin, initial_time_bin)
+        order = list(order_tuple)
+
+        battery_remaining = battery_budget_m
+        time_remaining = daylight_budget_s
+        pos = n
+        for action in order:
+            travel_m = float(distances[pos, action])
+            battery_remaining -= travel_m
+            time_remaining -= travel_m / self.config.nominal_speed_mps + self.config.service_time_s
+            pos = action
+
+        return SchedulePlan(
+            order=order,
+            expected_value=value,
+            battery_remaining_m=max(0.0, battery_remaining),
+            time_remaining_s=max(0.0, time_remaining),
+            dropped_goals=n - len(order),
+        )
 
     def _solve(
         self,
@@ -109,4 +193,3 @@ class InspectionScheduler:
             for goal_idx, goal in enumerate(goals):
                 distances[pos, goal_idx] = hypot(goal.x - origin_x, goal.y - origin_y)
         return distances
-

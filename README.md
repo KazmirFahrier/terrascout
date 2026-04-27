@@ -16,7 +16,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Compact EKF-SLAM back end with state expansion, covariance propagation, and range/bearing updates.
 - Grid A* path planning over inflated tree and worker obstacles.
 - Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives.
-- Value-iteration inspection scheduler over row-goal priority and travel cost.
+- Resource-aware inspection scheduler over row priority, travel cost, battery, and daylight budgets.
 - End-to-end row-inspection mission runner with deterministic metrics.
 - Static PNG and animated GIF rendering for mission traces.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
@@ -49,9 +49,9 @@ python -m unittest discover -s tests
 
 Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
 
-| Seeds | Mean inspection success | Collision events | Mean localization error | Mean wall time |
-| --- | ---: | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | 100% | 0 | ~0.19 m | ~3.0 s |
+| Seeds | Mean inspection success | Collision events | Mean localization error | Scheduler drops | Mean wall time |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 2, 3, 5, 7, 11 | 100% | 0 | ~0.19 m | 0 | ~3.0 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -80,7 +80,7 @@ Runtime flow:
 2. The Kalman tracker updates worker tracks and predicts near-future positions.
 3. The particle filter estimates rover pose from local tree observations.
 4. The landmark mapper accumulates a tree map from range/bearing detections.
-5. The scheduler chooses the next inspection goal from travel cost and row priority.
+5. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
 6. The planner builds an inflated occupancy grid from trees and predicted workers.
 7. The PID controller tracks the next waypoint.
 8. The mission runner records inspection, collision, mapping, EKF-SLAM, localization, path-length, and timing metrics.
