@@ -49,13 +49,29 @@ class KalmanTrack:
     def xy(self) -> NDArray[np.float64]:
         return self.state[:2].copy()
 
+    def mahalanobis_distance_sq(
+        self,
+        measurement_xy: NDArray[np.float64],
+        measurement_noise: float = 0.08,
+    ) -> float:
+        """Return squared innovation distance for association gating."""
+
+        h = np.array([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0]])
+        r = np.eye(2) * measurement_noise**2
+        residual = measurement_xy - h @ self.state
+        innovation_covariance = h @ self.covariance @ h.T + r
+        return float(residual.T @ np.linalg.inv(innovation_covariance) @ residual)
+
 
 @dataclass
 class MultiObjectTracker:
     """Nearest-neighbor multi-object tracker for worker detections."""
 
     gate_m: float = 1.2
+    gate_mahalanobis_sq: float = 9.21
     max_missed: int = 8
+    process_noise: float = 0.12
+    measurement_noise: float = 0.08
     tracks: list[KalmanTrack] = field(default_factory=list)
     _next_id: int = 1
 
@@ -66,7 +82,7 @@ class MultiObjectTracker:
             np.array([det.x, det.y], dtype=float) for det in detections if det.kind == "worker"
         ]
         for track in self.tracks:
-            track.predict(dt)
+            track.predict(dt, process_noise=self.process_noise)
 
         unmatched_tracks = set(range(len(self.tracks)))
         unmatched_measurements = set(range(len(worker_measurements)))
@@ -75,14 +91,18 @@ class MultiObjectTracker:
         for ti, track in enumerate(self.tracks):
             for mi, measurement in enumerate(worker_measurements):
                 dist = float(np.linalg.norm(track.xy - measurement))
-                if dist <= self.gate_m:
-                    pairs.append((dist, ti, mi))
+                mahalanobis = track.mahalanobis_distance_sq(
+                    measurement,
+                    measurement_noise=self.measurement_noise,
+                )
+                if dist <= self.gate_m and mahalanobis <= self.gate_mahalanobis_sq:
+                    pairs.append((mahalanobis, ti, mi))
         pairs.sort(key=lambda item: item[0])
 
         for _, ti, mi in pairs:
             if ti not in unmatched_tracks or mi not in unmatched_measurements:
                 continue
-            self.tracks[ti].update(worker_measurements[mi])
+            self.tracks[ti].update(worker_measurements[mi], measurement_noise=self.measurement_noise)
             unmatched_tracks.remove(ti)
             unmatched_measurements.remove(mi)
 

@@ -32,6 +32,7 @@ class ParticleLocalizer:
         x_bounds: tuple[float, float],
         y_bounds: tuple[float, float],
         seed: int = 7,
+        min_particles: int | None = None,
     ) -> "ParticleLocalizer":
         rng = np.random.default_rng(seed)
         particles = np.column_stack(
@@ -45,7 +46,7 @@ class ParticleLocalizer:
             particles=particles,
             weights=np.full(count, 1.0 / count),
             rng=rng,
-            min_particles=count if count <= 500 else max(100, min(count, int(0.9 * count))),
+            min_particles=min(count, min_particles or cls.min_particles),
             max_particles=count,
         )
 
@@ -56,6 +57,7 @@ class ParticleLocalizer:
         mean: Pose2D,
         std: tuple[float, float, float],
         seed: int = 7,
+        min_particles: int | None = None,
     ) -> "ParticleLocalizer":
         """Initialize particles from a coarse Gaussian pose prior."""
 
@@ -72,7 +74,7 @@ class ParticleLocalizer:
             particles=particles,
             weights=np.full(count, 1.0 / count),
             rng=rng,
-            min_particles=count if count <= 500 else max(100, min(count, int(0.9 * count))),
+            min_particles=min(count, min_particles or cls.min_particles),
             max_particles=count,
         )
 

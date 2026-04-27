@@ -143,6 +143,7 @@ class StressSummaryRow:
 
 DEFAULT_BENCHMARK_SEEDS = [2, 3, 5, 7, 11]
 TRACKING_ACCEPTANCE_SEEDS = list(range(100))
+LOCALIZATION_ACCEPTANCE_SEEDS = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
 SLAM_ACCEPTANCE_SEEDS = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
 DEFAULT_STRESS_SEEDS = [2, 7, 11]
 DEFAULT_ACCEPTANCE_SEEDS = [
@@ -398,7 +399,7 @@ def run_localization_benchmark(
     """Evaluate particle-filter relocalization from a +/-5 m, +/-30 degree prior."""
 
     rows: list[LocalizationBenchmarkRow] = []
-    for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
+    for seed in list(seeds or LOCALIZATION_ACCEPTANCE_SEEDS):
         started = perf_counter()
         rng = np.random.default_rng(seed)
         world = OrchardWorld(ScenarioConfig(rows=4, trees_per_row=6, worker_count=0, random_seed=seed))

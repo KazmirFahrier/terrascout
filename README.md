@@ -75,7 +75,16 @@ Run on a local laptop with the default configuration: 8 tree rows, 7 inspection 
 | Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Final SOC | Mean wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | ~90% | ~3.2 s |
-| 20-seed 30-row acceptance | truth | 100% | 0 | 0.199 m | n/a | 10.8 s |
+| 20-seed 30-row acceptance | truth | 100% | 0 | 0.201 m | n/a | 10.5 s |
+
+Layer KPI snapshot from the current reproducible benchmark suite:
+
+| Layer | Acceptance target | Current result |
+| --- | --- | ---: |
+| L1 Kalman tracker | <0.20 m 1-second prediction error; >=95% association | 0.037 m mean; 100% association across 100 scenes |
+| L2 particle filter | <0.15 m p95 pose error; <=3,000 particles | 0.029 m p95; <=169 particles across 10 wide-prior runs |
+| L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | 0.000% gap; <30 ms unconstrained / <13 ms resource-aware |
+| 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | 10/10 goals; 0 collisions; 12.00 s max wall time |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -93,7 +102,7 @@ Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark runs 5-minute traversals across ten 12x30 orchard layouts, observes up to 160 tree landmarks per layout, and reports final pose plus landmark-map error against ground truth.
 
-End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The current suite completes all priority goals with zero collisions, 0.199 m mean pose error, and a 12.20 s max single-mission wall time.
+End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The current suite completes all priority goals with zero collisions, 0.201 m mean pose error, and a 12.00 s max single-mission wall time.
 
 Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 

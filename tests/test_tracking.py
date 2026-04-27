@@ -38,6 +38,19 @@ class TrackerTest(unittest.TestCase):
         self.assertLess(max(row.mean_prediction_error_m for row in rows), 0.20)
         self.assertGreaterEqual(min(row.association_accuracy for row in rows), 0.95)
 
+    def test_mahalanobis_gate_rejects_close_outlier(self) -> None:
+        tracker = MultiObjectTracker(gate_m=1.2, gate_mahalanobis_sq=9.21)
+        dt = 0.1
+        for _ in range(20):
+            tracker.update([LidarDetection(0.0, 0.0, "worker")], dt)
+
+        stable_track_id = tracker.tracks[0].track_id
+        tracker.update([LidarDetection(0.8, 0.0, "worker")], dt)
+
+        self.assertEqual(tracker.tracks[0].track_id, stable_track_id)
+        self.assertLess(abs(float(tracker.tracks[0].state[0])), 0.2)
+        self.assertEqual(len(tracker.tracks), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

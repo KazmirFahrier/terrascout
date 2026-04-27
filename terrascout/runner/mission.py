@@ -103,6 +103,7 @@ def run_mission(
         mean=Pose2D(x=rover.pose.x + 0.25, y=rover.pose.y - 0.2, theta=rover.pose.theta + 0.08),
         std=(0.35, 0.35, 0.18),
         seed=seed + 101,
+        min_particles=450,
     )
     grid_planner = GridAStarPlanner(world)
     hybrid_planner = HybridAStarPlanner(world)

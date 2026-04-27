@@ -31,7 +31,7 @@ benchmark uses 100 deterministic scenes (`0..99`).
 | PID 90-degree heading step | <1.5 s settle, <8% overshoot |
 | 100-scene 10-worker tracking prediction | <0.05 m mean 1-second error |
 | 100-scene 10-worker association accuracy | 100% on deterministic benchmark |
-| Particle-filter relocalization | <0.03 m p95 from +/-5 m, +/-30 degree prior |
+| Particle-filter relocalization | <0.03 m p95 using <=169 particles from +/-5 m, +/-30 degree prior |
 | Scheduler oracle gap | 0% on deterministic 7-goal benchmark |
 | Resource scheduler oracle gap | 0% across 50 constrained randomized layouts |
 | Hybrid A* steering effort | >80% lower than grid A* baseline |
@@ -39,8 +39,8 @@ benchmark uses 100 deterministic scenes (`0..99`).
 | Mean localization error | ~0.19 m |
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |
-| 30-row acceptance pass | 10/10 priority goals, 0 collisions, 0.199 m mean pose error |
-| 30-row wall time | 12.20 s max over 20 seeded missions |
+| 30-row acceptance pass | 10/10 priority goals, 0 collisions, 0.201 m mean pose error |
+| 30-row wall time | 12.00 s max over 20 seeded missions |
 | Final battery SOC | ~90% |
 | Mean mission wall time | ~3.0 s |
 | Runtime safety layer | Reports interventions, stops, and minimum perceived worker clearance |

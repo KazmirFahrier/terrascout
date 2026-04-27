@@ -57,6 +57,18 @@ class ParticleLocalizerTest(unittest.TestCase):
         self.assertGreaterEqual(len(localizer.particles), localizer.min_particles)
         self.assertAlmostEqual(float(localizer.weights.sum()), 1.0)
 
+    def test_gaussian_constructor_accepts_mission_particle_floor(self) -> None:
+        localizer = ParticleLocalizer.gaussian(
+            500,
+            mean=Pose2D(1.0, 2.0, 0.2),
+            std=(0.2, 0.2, 0.1),
+            seed=14,
+            min_particles=450,
+        )
+
+        self.assertEqual(localizer.min_particles, 450)
+        self.assertEqual(localizer.max_particles, 500)
+
     def test_localization_benchmark_meets_l2_acceptance_metric(self) -> None:
         rows = run_localization_benchmark(seeds=[2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
         errors = [row.final_pose_error_m for row in rows]
@@ -64,7 +76,7 @@ class ParticleLocalizerTest(unittest.TestCase):
         self.assertGreater(min(row.prior_position_error_m for row in rows), 3.0)
         self.assertLessEqual(max(row.prior_heading_error_deg for row in rows), 30.0)
         self.assertLess(percentile(errors, 95), 0.15)
-        self.assertLessEqual(max(row.particle_count for row in rows), 3000)
+        self.assertLessEqual(max(row.particle_count for row in rows), 500)
 
 
 if __name__ == "__main__":

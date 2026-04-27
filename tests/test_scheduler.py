@@ -56,9 +56,9 @@ class InspectionSchedulerTest(unittest.TestCase):
         self.assertLessEqual(max(row.iterations for row in rows), 20)
 
     def test_resource_scheduler_benchmark_matches_oracle(self) -> None:
-        rows = run_resource_scheduler_benchmark(seeds=range(10), goal_count=8)
+        rows = run_resource_scheduler_benchmark(seeds=range(50), goal_count=8)
 
-        self.assertEqual(len(rows), 10)
+        self.assertEqual(len(rows), 50)
         self.assertLessEqual(max(row.optimality_gap_percent for row in rows), 0.01)
         self.assertLess(max(row.wall_time_ms for row in rows), 800.0)
         self.assertGreater(min(row.inspected_goals for row in rows), 0)
