@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass
-from math import hypot
+from math import hypot, pi
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Sequence
@@ -12,11 +12,13 @@ from typing import Any, Sequence
 import numpy as np
 from numpy.typing import NDArray
 
+from terrascout.control.pid import DriveController
 from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.runner.mission import MissionMetrics, run_mission, write_metrics_csv
-from terrascout.sim.geometry import Point2D, Pose2D
+from terrascout.sim.geometry import Point2D, Pose2D, wrap_angle
+from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.world import LidarDetection, OrchardWorld, ScenarioConfig
 from terrascout.tracking.kalman import MultiObjectTracker
 
@@ -27,6 +29,16 @@ class PlannerBenchmarkRow:
     planner: str
     waypoint_count: int
     path_length_m: float
+    wall_time_ms: float
+
+
+@dataclass(frozen=True)
+class ControlBenchmarkRow:
+    seed: int
+    slip_fraction: float
+    max_cross_track_error_m: float
+    heading_settle_time_s: float
+    heading_overshoot_fraction: float
     wall_time_ms: float
 
 
@@ -90,6 +102,34 @@ def run_mission_benchmark(
     metrics = [run_mission(seed=seed) for seed in benchmark_seeds]
     write_metrics_csv(metrics, output)
     return metrics
+
+
+def run_control_benchmark(
+    output: Path = Path("artifacts/control_benchmark.csv"),
+    seeds: Sequence[int] | None = None,
+) -> list[ControlBenchmarkRow]:
+    """Evaluate L0 straight-line tracking and 90-degree heading-step response."""
+
+    rows: list[ControlBenchmarkRow] = []
+    for seed in list(seeds or range(10)):
+        started = perf_counter()
+        rng = np.random.default_rng(seed)
+        slip_fraction = float(rng.uniform(0.0, 0.08))
+        max_cross_track = _straight_line_cross_track_error(slip_fraction)
+        settle_time, overshoot_fraction = _heading_step_response(slip_fraction)
+        rows.append(
+            ControlBenchmarkRow(
+                seed=seed,
+                slip_fraction=slip_fraction,
+                max_cross_track_error_m=max_cross_track,
+                heading_settle_time_s=settle_time,
+                heading_overshoot_fraction=overshoot_fraction,
+                wall_time_ms=(perf_counter() - started) * 1000.0,
+            )
+        )
+
+    _write_csv(rows, output)
+    return rows
 
 
 def run_planner_benchmark(
@@ -297,6 +337,45 @@ def run_stress_benchmark(
 
 def _point_length(points: Sequence[Point2D | Pose2D]) -> float:
     return sum(hypot(b.x - a.x, b.y - a.y) for a, b in zip(points, points[1:]))
+
+
+def _straight_line_cross_track_error(slip_fraction: float) -> float:
+    controller = DriveController.default()
+    rover = DifferentialDriveRover(
+        pose=Pose2D(0.0, 0.02, 0.02),
+        slip_fraction=slip_fraction,
+    )
+    goal = Point2D(8.0, 0.0)
+    dt = 0.05
+    max_cross_track = abs(rover.pose.y)
+    for _ in range(180):
+        left, right = controller.wheel_commands(rover.pose, goal, dt)
+        rover.command(left, right)
+        rover.step(dt)
+        max_cross_track = max(max_cross_track, abs(rover.pose.y))
+    return max_cross_track
+
+
+def _heading_step_response(slip_fraction: float) -> tuple[float, float]:
+    controller = DriveController.default()
+    rover = DifferentialDriveRover(
+        pose=Pose2D(0.0, 0.0, 0.0),
+        slip_fraction=slip_fraction,
+    )
+    goal = Point2D(0.0, 5.0)
+    dt = 0.05
+    target_heading = pi / 2.0
+    max_heading = rover.pose.theta
+    settle_time = 5.0
+    for step in range(100):
+        left, right = controller.wheel_commands(rover.pose, goal, dt)
+        rover.command(left, right)
+        rover.step(dt)
+        max_heading = max(max_heading, rover.pose.theta)
+        if settle_time >= 5.0 and abs(wrap_angle(target_heading - rover.pose.theta)) < 0.035:
+            settle_time = step * dt
+    overshoot_fraction = max(0.0, max_heading - target_heading) / target_heading
+    return settle_time, overshoot_fraction
 
 
 def _initial_worker_positions(rng: np.random.Generator, worker_count: int) -> NDArray[np.float64]:

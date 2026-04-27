@@ -4,6 +4,7 @@ from pathlib import Path
 import unittest
 
 from terrascout.eval.benchmarks import (
+    ControlBenchmarkRow,
     PlannerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
@@ -48,6 +49,7 @@ class ReproduceSummaryTest(unittest.TestCase):
             artifacts_dir=Path("artifacts"),
             mission=mission,
             mission_rows=[mission],
+            control_rows=[ControlBenchmarkRow(7, 0.02, 0.02, 1.0, 0.04, 1.0)],
             tracking_rows=[TrackingBenchmarkRow(7, 10, 10, 0.04, 1.0, 2.0)],
             planner_rows=[
                 PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 8.0),
@@ -61,6 +63,7 @@ class ReproduceSummaryTest(unittest.TestCase):
         self.assertEqual(summary["artifacts_dir"], "artifacts")
         self.assertEqual(summary["mission"]["collisions"], 0)
         self.assertEqual(summary["benchmark_summary"]["mission_total_collisions"], 0)
+        self.assertEqual(summary["benchmark_summary"]["control_max_cross_track_error_m"], 0.02)
         self.assertEqual(summary["benchmark_summary"]["tracking_mean_association_accuracy"], 1.0)
         self.assertEqual(
             summary["benchmark_summary"]["planner_mean_wall_time_ms"]["hybrid_astar"],

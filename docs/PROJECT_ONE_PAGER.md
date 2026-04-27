@@ -26,6 +26,8 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | --- | ---: |
 | Mission inspection success | 100% |
 | Collision events | 0 |
+| PID straight-line cross-track | <0.03 m max over 10 slip runs |
+| PID 90-degree heading step | <1.5 s settle, <8% overshoot |
 | 10-worker tracking prediction | <0.05 m mean 1-second error |
 | 10-worker association accuracy | 100% on deterministic benchmark |
 | Mean localization error | ~0.19 m |
@@ -53,6 +55,7 @@ Individual commands:
 ```bash
 python -m terrascout.runner.mission --scenario scenarios/default_orchard.json
 python benchmarks/run_benchmark.py
+python benchmarks/control_benchmark.py
 python benchmarks/tracking_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py

@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from terrascout.eval.benchmarks import (
+    ControlBenchmarkRow,
     PlannerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
     TrackingBenchmarkRow,
     run_mission_benchmark,
+    run_control_benchmark,
     run_planner_benchmark,
     run_slam_benchmark,
     run_stress_benchmark,
@@ -49,6 +51,7 @@ def run_reproduce(
         outputs["mission_trace_gif"] = gif_path
 
     mission_rows = run_mission_benchmark(artifacts_dir / "benchmark.csv")
+    control_rows = run_control_benchmark(artifacts_dir / "control_benchmark.csv")
     tracking_rows = run_tracking_benchmark(artifacts_dir / "tracking_benchmark.csv")
     planner_rows = run_planner_benchmark(artifacts_dir / "planner_benchmark.csv")
     slam_rows = run_slam_benchmark(artifacts_dir / "slam_benchmark.csv")
@@ -61,6 +64,7 @@ def run_reproduce(
         artifacts_dir=artifacts_dir,
         mission=mission,
         mission_rows=mission_rows,
+        control_rows=control_rows,
         tracking_rows=tracking_rows,
         planner_rows=planner_rows,
         slam_rows=slam_rows,
@@ -77,6 +81,7 @@ def build_reproduce_summary(
     artifacts_dir: Path,
     mission: MissionMetrics,
     mission_rows: list[MissionMetrics],
+    control_rows: list[ControlBenchmarkRow],
     tracking_rows: list[TrackingBenchmarkRow],
     planner_rows: list[PlannerBenchmarkRow],
     slam_rows: list[SlamBenchmarkRow],
@@ -92,6 +97,18 @@ def build_reproduce_summary(
             "mission_runs": len(mission_rows),
             "mission_mean_success_rate": _mean([row.success_rate for row in mission_rows]),
             "mission_total_collisions": sum(row.collisions for row in mission_rows),
+            "control_max_cross_track_error_m": max(
+                (row.max_cross_track_error_m for row in control_rows),
+                default=0.0,
+            ),
+            "control_max_heading_settle_time_s": max(
+                (row.heading_settle_time_s for row in control_rows),
+                default=0.0,
+            ),
+            "control_max_heading_overshoot_fraction": max(
+                (row.heading_overshoot_fraction for row in control_rows),
+                default=0.0,
+            ),
             "tracking_mean_prediction_error_m": _mean(
                 [row.mean_prediction_error_m for row in tracking_rows]
             ),

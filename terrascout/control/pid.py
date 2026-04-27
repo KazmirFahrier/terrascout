@@ -48,7 +48,7 @@ class DriveController:
     @classmethod
     def default(cls) -> "DriveController":
         return cls(
-            heading_pid=PID(kp=2.9, ki=0.0, kd=0.18, integral_limit=0.5),
+            heading_pid=PID(kp=2.95, ki=0.0, kd=0.05, integral_limit=0.5),
             speed_pid=PID(kp=1.2, ki=0.05, kd=0.02, integral_limit=1.0),
         )
 
@@ -70,4 +70,3 @@ class DriveController:
 
     def _clip(self, value: float) -> float:
         return max(-self.max_wheel_speed_mps, min(self.max_wheel_speed_mps, value))
-

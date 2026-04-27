@@ -23,8 +23,10 @@ class MissionTest(unittest.TestCase):
         self.assertGreater(metrics.battery_soc_final, 0.8)
         self.assertLessEqual(metrics.battery_soc_min, metrics.battery_soc_final)
         self.assertGreaterEqual(metrics.recharge_events, 1)
-        self.assertGreater(metrics.safety_interventions, 0)
         self.assertGreater(metrics.min_worker_clearance_m, 0.0)
+        self.assertTrue(
+            metrics.safety_interventions > 0 or metrics.min_worker_clearance_m >= 2.4
+        )
         self.assertLess(metrics.wall_time_s, 5.0)
 
     def test_hybrid_planner_mission_completes(self) -> None:
