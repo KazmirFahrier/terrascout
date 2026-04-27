@@ -20,3 +20,4 @@ jobs:
       - run: python benchmarks/run_benchmark.py
       - run: python benchmarks/planner_benchmark.py
       - run: python benchmarks/slam_benchmark.py
+      - run: python benchmarks/stress_benchmark.py

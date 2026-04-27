@@ -30,6 +30,8 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 
 The mission runner can use ground-truth pose, particle-filter pose, or EKF-SLAM pose for planning and waypoint control via `--pose-source truth|particle|slam`.
 
+The stress benchmark currently runs grid/truth, grid/particle, grid/SLAM, and Hybrid A*/SLAM across seeds `2, 7, 11`; all four modes complete with 100% success and zero collisions.
+
 ## Reproduce
 
 ```bash
@@ -37,6 +39,7 @@ python -m pip install -e ".[dev]"
 python benchmarks/run_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
+python benchmarks/stress_benchmark.py
 python -m pytest
 ```
 

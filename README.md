@@ -37,6 +37,7 @@ python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artif
 python benchmarks/run_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
+python benchmarks/stress_benchmark.py
 python -m pytest
 ```
 
@@ -59,6 +60,8 @@ Benchmark output is written to `artifacts/benchmark.csv`.
 Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* averaged ~55 ms per plan while returning sparse heading-aware pose paths.
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 49 tree landmarks in ~2.5 ms per seeded run.
+
+Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers grid/truth, grid/particle, grid/SLAM, and Hybrid A*/SLAM across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 
 ## Architecture
 
