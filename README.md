@@ -32,6 +32,14 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+python -m terrascout.runner.reproduce --skip-gif
+```
+
+That one command writes the demo trace, PNG, metrics CSVs, benchmark CSVs, stress-test outputs, and `artifacts/reproduce_summary.json`. To also regenerate the animated GIF, omit `--skip-gif`.
+
+Useful individual commands:
+
+```bash
 python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.json
 python -m terrascout.runner.mission --scenario scenarios/default_orchard.json --trace artifacts/scenario_trace.json
 python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/hybrid_trace.json

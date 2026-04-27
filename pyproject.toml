@@ -26,6 +26,7 @@ dev = [
 [project.scripts]
 terrascout-demo = "terrascout.runner.mission:main"
 terrascout-render = "terrascout.viz.render:main"
+terrascout-reproduce = "terrascout.runner.reproduce:main"
 
 [tool.setuptools.packages.find]
 include = ["terrascout*"]

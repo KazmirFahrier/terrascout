@@ -40,6 +40,14 @@ The stress benchmark currently runs worker-present grid/truth and grid/particle 
 
 ```bash
 python -m pip install -e ".[dev]"
+python -m terrascout.runner.reproduce --skip-gif
+```
+
+The reproduce command writes the mission trace, PNG, metrics CSVs, benchmark CSVs, stress-test outputs, and `artifacts/reproduce_summary.json`. Drop `--skip-gif` to regenerate the animated mission GIF too.
+
+Individual commands:
+
+```bash
 python -m terrascout.runner.mission --scenario scenarios/default_orchard.json
 python benchmarks/run_benchmark.py
 python benchmarks/planner_benchmark.py
