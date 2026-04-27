@@ -129,7 +129,28 @@ class StressSummaryRow:
 
 DEFAULT_BENCHMARK_SEEDS = [2, 3, 5, 7, 11]
 DEFAULT_STRESS_SEEDS = [2, 7, 11]
-DEFAULT_ACCEPTANCE_SEEDS = [2, 7, 11]
+DEFAULT_ACCEPTANCE_SEEDS = [
+    2,
+    3,
+    5,
+    7,
+    11,
+    13,
+    17,
+    19,
+    23,
+    29,
+    31,
+    37,
+    41,
+    43,
+    47,
+    53,
+    59,
+    61,
+    67,
+    71,
+]
 DEFAULT_STRESS_SCENARIOS = [
     StressScenario("grid_truth", "grid", "truth"),
     StressScenario("grid_particle", "grid", "particle"),

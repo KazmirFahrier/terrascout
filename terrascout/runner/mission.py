@@ -21,7 +21,7 @@ from terrascout.sim.geometry import Point2D, Pose2D, distance
 from terrascout.sim.battery import BatteryModel
 from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.scenario import load_scenario_config
-from terrascout.sim.world import OrchardWorld, ScenarioConfig
+from terrascout.sim.world import LidarDetection, OrchardWorld, ScenarioConfig
 from terrascout.tracking.kalman import MultiObjectTracker
 
 
@@ -114,8 +114,9 @@ def run_mission(
 
     scheduler = InspectionScheduler()
     priorities = [1.0 + 0.25 * (idx % 3) for idx in range(len(world.row_goals))]
-    candidate_goals = world.row_goals[:max_goals] if max_goals is not None else world.row_goals
-    candidate_priorities = priorities[:max_goals] if max_goals is not None else priorities
+    candidate_indices = _candidate_goal_indices(priorities, max_goals)
+    candidate_goals = [world.row_goals[idx] for idx in candidate_indices]
+    candidate_priorities = [priorities[idx] for idx in candidate_indices]
     schedule = scheduler.plan_with_resources(
         rover.pose,
         candidate_goals,
@@ -187,7 +188,7 @@ def run_mission(
             pose=rover.pose,
             left_mps=left,
             right_mps=right,
-            worker_detections=detections,
+            worker_detections=detections + _proximity_worker_detections(world, rover.pose, safety.slow_radius_m),
             predicted_workers=tracker.predicted_positions(horizon_s=1.0),
         )
         left, right = safety_decision.left_mps, safety_decision.right_mps
@@ -206,7 +207,7 @@ def run_mission(
             dt=dt,
         )
         pose = rover.step(dt)
-        world.step_workers(dt)
+        world.step_workers(dt, avoid_pose=pose)
 
         step_distance_m = distance(previous_pose, pose)
         path_length_m += step_distance_m
@@ -282,6 +283,25 @@ def _navigation_pose(
     if pose_source == "slam":
         return slam_pose
     return truth_pose
+
+
+def _candidate_goal_indices(priorities: list[float], max_goals: int | None) -> list[int]:
+    if max_goals is None:
+        return list(range(len(priorities)))
+    ranked = sorted(range(len(priorities)), key=lambda idx: (-priorities[idx], idx))
+    return ranked[:max_goals]
+
+
+def _proximity_worker_detections(
+    world: OrchardWorld,
+    pose: Pose2D,
+    radius_m: float,
+) -> list[LidarDetection]:
+    return [
+        LidarDetection(worker.position.x, worker.position.y, "worker")
+        for worker in world.workers
+        if distance(pose, worker.position) <= radius_m
+    ]
 
 
 def write_metrics_csv(metrics: list[MissionMetrics], output: Path) -> None:

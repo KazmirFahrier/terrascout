@@ -93,6 +93,7 @@ class ParticleLocalizer:
         landmarks: list[Point2D],
         max_detections: int = 6,
         sigma_m: float = 0.35,
+        landmark_margin_m: float = 3.0,
     ) -> None:
         """Weight particles by nearest-landmark residuals from tree detections."""
 
@@ -100,7 +101,7 @@ class ParticleLocalizer:
         if not tree_observations or not landmarks:
             return
 
-        landmark_xy = np.array([(landmark.x, landmark.y) for landmark in landmarks], dtype=float)
+        landmark_xy = self._candidate_landmarks(landmarks, tree_observations, landmark_margin_m)
         log_weights = np.log(self.weights + 1e-300)
         for obs in tree_observations:
             obs_global_x = self.particles[:, 0] + obs.range_m * np.cos(self.particles[:, 2] + obs.bearing_rad)
@@ -169,3 +170,29 @@ class ParticleLocalizer:
         sin_mean = float(np.average(np.sin(self.particles[:, 2]), weights=self.weights))
         cos_mean = float(np.average(np.cos(self.particles[:, 2]), weights=self.weights))
         return Pose2D(x=x, y=y, theta=atan2(sin_mean, cos_mean))
+
+    def _candidate_landmarks(
+        self,
+        landmarks: list[Point2D],
+        observations: list[LocalLidarDetection],
+        margin_m: float,
+    ) -> NDArray[np.float64]:
+        """Return nearby map landmarks when the particle cloud is already localized."""
+
+        landmark_xy = np.array([(landmark.x, landmark.y) for landmark in landmarks], dtype=float)
+        if len(landmark_xy) <= 80:
+            return landmark_xy
+
+        mean = self.estimate()
+        max_observed_range = max(obs.range_m for obs in observations)
+        particle_spread = float(
+            np.sqrt(
+                np.average((self.particles[:, 0] - mean.x) ** 2, weights=self.weights)
+                + np.average((self.particles[:, 1] - mean.y) ** 2, weights=self.weights)
+            )
+        )
+        radius_m = max_observed_range + particle_spread + margin_m
+        deltas = landmark_xy - np.array([[mean.x, mean.y]])
+        mask = np.sum(deltas**2, axis=1) <= radius_m * radius_m
+        candidates = landmark_xy[mask]
+        return candidates if len(candidates) >= 4 else landmark_xy

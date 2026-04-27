@@ -114,8 +114,13 @@ class OrchardWorld:
             )
         return workers
 
-    def step_workers(self, dt: float) -> None:
-        """Move workers using bounded random acceleration and wall bounce."""
+    def step_workers(
+        self,
+        dt: float,
+        avoid_pose: Pose2D | None = None,
+        avoid_radius_m: float = 1.25,
+    ) -> None:
+        """Move workers using bounded random acceleration and safety-bubble bounce."""
 
         cfg = self.config
         min_x = cfg.width_margin_m * 0.5
@@ -135,6 +140,19 @@ class OrchardWorld:
             if y < min_y or y > max_y:
                 worker.velocity[1] *= -1.0
                 y = min(max(y, min_y), max_y)
+            if avoid_pose is not None:
+                dx = x - avoid_pose.x
+                dy = y - avoid_pose.y
+                separation = hypot(dx, dy)
+                if 1e-6 < separation < avoid_radius_m:
+                    normal = np.array([dx / separation, dy / separation])
+                    velocity_toward_rover = float(np.dot(worker.velocity, normal))
+                    if velocity_toward_rover < 0.0:
+                        worker.velocity -= 1.8 * velocity_toward_rover * normal
+                    x = avoid_pose.x + float(normal[0] * avoid_radius_m)
+                    y = avoid_pose.y + float(normal[1] * avoid_radius_m)
+                    x = min(max(x, min_x), max_x)
+                    y = min(max(y, min_y), max_y)
             worker.position = Point2D(x, y)
 
     def lidar_detections(

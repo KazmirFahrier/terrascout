@@ -72,6 +72,7 @@ Run on a local laptop with the default configuration: 8 tree rows, 7 inspection 
 | Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Final SOC | Mean wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
 | 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | ~90% | ~3.2 s |
+| 20-seed 30-row acceptance | truth | 100% | 0 | 0.199 m | n/a | 10.8 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -89,7 +90,7 @@ Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 39 tree landmarks and reports final pose plus landmark-map error against ground truth.
 
-End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs a 30-row orchard priority pass with 10 scheduled inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans.
+End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The current suite completes all priority goals with zero collisions, 0.199 m mean pose error, and a 12.43 s max single-mission wall time.
 
 Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 
@@ -126,7 +127,7 @@ Runtime flow:
 
 - Stress-test estimated-pose control across larger randomized scenario suites.
 - Use Hybrid A* as the default mission planner after more stress testing.
-- Extend the 30-row acceptance suite from the current 3 seeded runs to the full 20-mission challenge target.
+- Add per-layer derivation notes for the motion, measurement, planning, and scheduling models.
 - Expand tests into coverage-gated CI.
 
 ## Why This Exists

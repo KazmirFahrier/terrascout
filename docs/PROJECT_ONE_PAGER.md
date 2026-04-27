@@ -37,7 +37,8 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | Mean localization error | ~0.19 m |
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |
-| 30-row acceptance pass | 10/10 priority goals, 0 collisions on current 3-seed suite |
+| 30-row acceptance pass | 10/10 priority goals, 0 collisions, 0.199 m mean pose error |
+| 30-row wall time | 12.43 s max over 20 seeded missions |
 | Final battery SOC | ~90% |
 | Mean mission wall time | ~3.0 s |
 | Runtime safety layer | Reports interventions, stops, and minimum perceived worker clearance |
@@ -75,5 +76,5 @@ python -m pytest
 
 - Stress-test KLD-adaptive particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
-- Expand the 30-row acceptance suite from the current 3 seeded runs to the full 20-mission challenge target.
+- Add per-layer derivation notes for the motion, measurement, planning, and scheduling models.
 - Add coverage badges, richer demo GIFs, and a short narrated demo video.

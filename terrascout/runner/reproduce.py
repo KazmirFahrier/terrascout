@@ -165,7 +165,14 @@ def build_reproduce_summary(
                 default=0,
             ),
             "end_to_end_mean_success_rate": _mean([row.success_rate for row in end_to_end_rows]),
+            "end_to_end_min_success_rate": min(
+                (row.success_rate for row in end_to_end_rows),
+                default=0.0,
+            ),
             "end_to_end_total_collisions": sum(row.collisions for row in end_to_end_rows),
+            "end_to_end_mean_pose_error_m": _mean(
+                [row.mean_localization_error_m for row in end_to_end_rows]
+            ),
             "end_to_end_max_wall_time_s": max(
                 (row.wall_time_s for row in end_to_end_rows),
                 default=0.0,

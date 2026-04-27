@@ -85,7 +85,9 @@ class ReproduceSummaryTest(unittest.TestCase):
         )
         self.assertEqual(summary["benchmark_summary"]["slam_mean_pose_error_m"], 0.04)
         self.assertEqual(summary["benchmark_summary"]["end_to_end_rows"], 30)
+        self.assertEqual(summary["benchmark_summary"]["end_to_end_min_success_rate"], 1.0)
         self.assertEqual(summary["benchmark_summary"]["end_to_end_total_collisions"], 0)
+        self.assertEqual(summary["benchmark_summary"]["end_to_end_mean_pose_error_m"], 0.2)
         self.assertEqual(summary["outputs"]["mission_trace_json"], "artifacts/mission_trace.json")
 
 

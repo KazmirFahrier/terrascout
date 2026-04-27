@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import unittest
 
+import numpy as np
+
 from terrascout.safety.collision_guard import SafetySupervisor
-from terrascout.sim.geometry import Pose2D
-from terrascout.sim.world import LidarDetection
+from terrascout.sim.geometry import Point2D, Pose2D, distance
+from terrascout.sim.world import LidarDetection, MovingAgent, OrchardWorld, ScenarioConfig
 
 
 class SafetySupervisorTest(unittest.TestCase):
@@ -54,7 +56,20 @@ class SafetySupervisorTest(unittest.TestCase):
         self.assertEqual(decision.right_mps, 0.7)
         self.assertFalse(decision.intervened)
 
+    def test_worker_dynamics_respect_rover_safety_bubble(self) -> None:
+        world = OrchardWorld(ScenarioConfig(worker_count=0, random_seed=7))
+        world.workers = [
+            MovingAgent(
+                position=Point2D(0.9, 0.0),
+                velocity=np.array([-0.2, 0.0]),
+            )
+        ]
+
+        world.step_workers(dt=0.1, avoid_pose=Pose2D(0.0, 0.0, 0.0), avoid_radius_m=1.25)
+
+        self.assertGreaterEqual(distance(world.workers[0].position, Point2D(0.0, 0.0)), 1.25)
+        self.assertGreater(world.workers[0].velocity[0], 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()
-
