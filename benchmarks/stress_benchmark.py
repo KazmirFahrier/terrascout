@@ -36,8 +36,8 @@ class StressSummaryRow:
 DEFAULT_SCENARIOS = [
     StressScenario("grid_truth", "grid", "truth"),
     StressScenario("grid_particle", "grid", "particle"),
-    StressScenario("grid_slam", "grid", "slam"),
-    StressScenario("hybrid_slam", "hybrid", "slam"),
+    StressScenario("grid_slam_clear", "grid", "slam", workers=0),
+    StressScenario("hybrid_slam_clear", "hybrid", "slam", workers=0),
 ]
 
 

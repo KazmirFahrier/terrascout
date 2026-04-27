@@ -15,6 +15,7 @@ from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.mapping.landmarks import LandmarkMapper
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
+from terrascout.safety.collision_guard import SafetySupervisor
 from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D, distance
 from terrascout.sim.rover import DifferentialDriveRover
@@ -45,6 +46,9 @@ class MissionMetrics:
     scheduler_dropped_goals: int
     battery_remaining_m: float
     daylight_remaining_s: float
+    safety_interventions: int
+    safety_stops: int
+    min_worker_clearance_m: float
     replans: int
 
 
@@ -84,6 +88,7 @@ def run_mission(
     tracker = MultiObjectTracker()
     mapper = LandmarkMapper()
     slam = EkfSlam(rover.pose)
+    safety = SafetySupervisor()
     localizer = ParticleLocalizer.gaussian(
         500,
         mean=Pose2D(x=rover.pose.x + 0.25, y=rover.pose.y - 0.2, theta=rover.pose.theta + 0.08),
@@ -117,6 +122,9 @@ def run_mission(
     previous_pose = rover.pose
     localization_error_sum = 0.0
     localization_error_count = 0
+    safety_interventions = 0
+    safety_stops = 0
+    min_worker_clearance_m = float("inf")
 
     trace = MissionTrace(poses=[], goals=[(goal.x, goal.y) for goal in goals], workers=[])
 
@@ -158,14 +166,18 @@ def run_mission(
             current_waypoint_idx += 1
             waypoint = current_path[current_waypoint_idx]
 
-        worker_clearance_m = min(
-            (distance(rover.pose, worker.position) for worker in world.workers),
-            default=float("inf"),
+        left, right = controller.wheel_commands(navigation_pose, waypoint, dt)
+        safety_decision = safety.supervise(
+            pose=rover.pose,
+            left_mps=left,
+            right_mps=right,
+            worker_detections=detections,
+            predicted_workers=tracker.predicted_positions(horizon_s=1.0),
         )
-        if worker_clearance_m < 1.45:
-            left, right = 0.0, 0.0
-        else:
-            left, right = controller.wheel_commands(navigation_pose, waypoint, dt)
+        left, right = safety_decision.left_mps, safety_decision.right_mps
+        safety_interventions += int(safety_decision.intervened)
+        safety_stops += int(safety_decision.stopped)
+        min_worker_clearance_m = min(min_worker_clearance_m, safety_decision.min_clearance_m)
         rover.command(left, right)
         localizer.predict(
             linear_mps=0.5 * (left + right),
@@ -221,6 +233,9 @@ def run_mission(
         scheduler_dropped_goals=schedule.dropped_goals,
         battery_remaining_m=schedule.battery_remaining_m,
         daylight_remaining_s=schedule.time_remaining_s,
+        safety_interventions=safety_interventions,
+        safety_stops=safety_stops,
+        min_worker_clearance_m=min_worker_clearance_m,
         replans=replans,
     )
     if trace_path is not None:

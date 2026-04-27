@@ -19,6 +19,8 @@ class MissionTest(unittest.TestCase):
         self.assertEqual(metrics.scheduler_dropped_goals, 0)
         self.assertGreater(metrics.battery_remaining_m, 0.0)
         self.assertGreater(metrics.daylight_remaining_s, 0.0)
+        self.assertGreater(metrics.safety_interventions, 0)
+        self.assertGreater(metrics.min_worker_clearance_m, 0.0)
         self.assertLess(metrics.wall_time_s, 5.0)
 
     def test_hybrid_planner_mission_completes(self) -> None:

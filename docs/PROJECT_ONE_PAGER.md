@@ -14,6 +14,7 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 | L3 Mapping | EKF-SLAM | Compact state/covariance SLAM with range/bearing landmark updates |
 | L4 Planning | Grid A* + Hybrid A* | Fast grid routing plus heading-aware Hybrid A* arc primitives |
 | L5 Scheduling | Resource-aware value search | Row scheduling under priority, travel cost, battery, and daylight budgets |
+| L6 Safety | Command supervision | Wheel-command scaling near perceived or predicted workers |
 
 ## Current Metrics
 
@@ -27,10 +28,11 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |
 | Mean mission wall time | ~3.0 s |
+| Runtime safety layer | Reports interventions, stops, and minimum perceived worker clearance |
 
 The mission runner can use ground-truth pose, particle-filter pose, or EKF-SLAM pose for planning and waypoint control via `--pose-source truth|particle|slam`.
 
-The stress benchmark currently runs grid/truth, grid/particle, grid/SLAM, and Hybrid A*/SLAM across seeds `2, 7, 11`; all four modes complete with 100% success and zero collisions.
+The stress benchmark currently runs worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes complete with 100% success and zero collisions.
 
 ## Reproduce
 

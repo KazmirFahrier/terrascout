@@ -17,6 +17,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Grid A* path planning over inflated tree and worker obstacles.
 - Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives.
 - Resource-aware inspection scheduler over row priority, travel cost, battery, and daylight budgets.
+- Runtime safety supervisor that scales wheel commands near perceived or predicted workers.
 - End-to-end row-inspection mission runner with deterministic metrics.
 - Static PNG and animated GIF rendering for mission traces.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
@@ -53,7 +54,7 @@ Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspect
 
 | Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Scheduler drops | Mean wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | 0 | ~3.0 s |
+| 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | 0 | ~3.2 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -61,7 +62,7 @@ Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 49 tree landmarks in ~2.5 ms per seeded run.
 
-Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers grid/truth, grid/particle, grid/SLAM, and Hybrid A*/SLAM across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
+Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 
 ## Architecture
 
@@ -86,8 +87,9 @@ Runtime flow:
 4. The landmark mapper accumulates a tree map from range/bearing detections.
 5. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
 6. The planner builds an inflated occupancy grid from trees and predicted workers.
-7. The PID controller tracks the next waypoint using truth, particle-filter, or EKF-SLAM pose.
-8. The mission runner records inspection, collision, mapping, EKF-SLAM, localization, path-length, and timing metrics.
+7. The PID controller proposes wheel commands from truth, particle-filter, or EKF-SLAM pose.
+8. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
+9. The mission runner records inspection, collision, safety, mapping, EKF-SLAM, localization, path-length, and timing metrics.
 
 ## Roadmap
 
