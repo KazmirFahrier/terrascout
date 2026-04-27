@@ -40,6 +40,7 @@ The stress benchmark currently runs worker-present grid/truth and grid/particle 
 
 ```bash
 python -m pip install -e ".[dev]"
+python -m terrascout.runner.mission --scenario scenarios/default_orchard.json
 python benchmarks/run_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py

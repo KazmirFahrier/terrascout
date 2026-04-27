@@ -20,6 +20,7 @@ from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D, distance
 from terrascout.sim.battery import BatteryModel
 from terrascout.sim.rover import DifferentialDriveRover
+from terrascout.sim.scenario import load_scenario_config
 from terrascout.sim.world import OrchardWorld, ScenarioConfig
 from terrascout.tracking.kalman import MultiObjectTracker
 
@@ -74,19 +75,19 @@ def run_mission(
     dt: float = 0.05,
     planner_kind: str = "grid",
     pose_source: str = "truth",
+    scenario_config: ScenarioConfig | None = None,
     trace_path: Path | None = None,
 ) -> MissionMetrics:
     """Run a complete deterministic orchard-inspection mission."""
 
     started = perf_counter()
-    world = OrchardWorld(
-        ScenarioConfig(
-            rows=rows,
-            trees_per_row=trees_per_row,
-            worker_count=worker_count,
-            random_seed=seed,
-        )
+    config = scenario_config or ScenarioConfig(
+        rows=rows,
+        trees_per_row=trees_per_row,
+        worker_count=worker_count,
+        random_seed=seed,
     )
+    world = OrchardWorld(config)
     rover = DifferentialDriveRover(pose=Pose2D(x=1.0, y=0.8, theta=1.25), slip_fraction=0.04)
     battery = BatteryModel()
     controller = DriveController.default()
@@ -228,7 +229,7 @@ def run_mission(
 
     mission_time_s = min(max_steps * dt, (step + 1) * dt)
     metrics = MissionMetrics(
-        seed=seed,
+        seed=config.random_seed,
         inspected_rows=len(inspected),
         total_rows=len(goals),
         success_rate=len(inspected) / len(goals) if goals else 1.0,
@@ -295,6 +296,7 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--planner", choices=["grid", "hybrid"], default="grid")
     parser.add_argument("--pose-source", choices=["truth", "particle", "slam"], default="truth")
+    parser.add_argument("--scenario", type=Path, default=None)
     parser.add_argument("--trace", type=Path, default=Path("artifacts/mission_trace.json"))
     parser.add_argument("--csv", type=Path, default=None)
     args = parser.parse_args()
@@ -306,6 +308,7 @@ def main() -> None:
         worker_count=args.workers,
         planner_kind=args.planner,
         pose_source=args.pose_source,
+        scenario_config=load_scenario_config(args.scenario) if args.scenario is not None else None,
         trace_path=args.trace,
     )
     print(json.dumps(asdict(metrics), indent=2))

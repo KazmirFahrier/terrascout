@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from terrascout.runner.mission import run_mission
+from terrascout.sim.world import ScenarioConfig
 
 
 class MissionTest(unittest.TestCase):
@@ -49,6 +50,15 @@ class MissionTest(unittest.TestCase):
         self.assertEqual(metrics.collisions, 0)
         self.assertEqual(metrics.pose_source, "slam")
         self.assertGreater(metrics.slam_landmarks, 50)
+
+    def test_mission_accepts_scenario_config(self) -> None:
+        config = ScenarioConfig(rows=5, trees_per_row=8, worker_count=0, random_seed=13)
+
+        metrics = run_mission(scenario_config=config)
+
+        self.assertEqual(metrics.seed, 13)
+        self.assertGreater(metrics.total_rows, 0)
+        self.assertEqual(metrics.collisions, 0)
 
 
 if __name__ == "__main__":

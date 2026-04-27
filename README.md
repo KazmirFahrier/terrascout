@@ -33,6 +33,7 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.json
+python -m terrascout.runner.mission --scenario scenarios/default_orchard.json --trace artifacts/scenario_trace.json
 python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/hybrid_trace.json
 python -m terrascout.runner.mission --seed 7 --pose-source particle --trace artifacts/particle_trace.json
 python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
@@ -59,6 +60,8 @@ Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspect
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
+Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers around `ScenarioConfig`, so benchmark scenes can be reviewed and versioned without changing Python code.
+
 Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* averaged ~55 ms per plan while returning sparse heading-aware pose paths.
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 49 tree landmarks in ~2.5 ms per seeded run.
@@ -70,6 +73,7 @@ Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. 
 ```text
 terrascout/
   sim/        orchard world, rover kinematics, sensor detections
+  scenarios/  reproducible JSON scenario configs
   control/    PID drive controller
   tracking/   Kalman worker tracker
   localize/   particle-filter localization

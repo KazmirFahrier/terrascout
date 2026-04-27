@@ -1,0 +1,11 @@
+{
+  "rows": 8,
+  "trees_per_row": 14,
+  "row_spacing_m": 3.0,
+  "tree_spacing_m": 2.4,
+  "worker_count": 1,
+  "width_margin_m": 2.0,
+  "lidar_range_m": 8.0,
+  "random_seed": 7
+}
+
