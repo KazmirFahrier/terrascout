@@ -28,3 +28,4 @@ jobs:
       - run: python benchmarks/end_to_end_benchmark.py
       - run: python benchmarks/stress_benchmark.py
       - run: python docs/design/render_design_pdfs.py
+      - run: python docs/render_project_one_pager_pdf.py

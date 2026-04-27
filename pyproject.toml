@@ -41,4 +41,4 @@ strict = true
 packages = ["terrascout"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=terrascout --cov-report=term-missing --cov-fail-under=70"
+addopts = "--cov=terrascout --cov-report=term-missing --cov-fail-under=80"

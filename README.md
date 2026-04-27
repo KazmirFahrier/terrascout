@@ -58,6 +58,7 @@ python benchmarks/slam_benchmark.py
 python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
 python docs/design/render_design_pdfs.py
+python docs/render_project_one_pager_pdf.py
 python -m pytest
 ```
 
@@ -140,4 +141,6 @@ for L0 through L5; `python docs/design/render_design_pdfs.py` regenerates PDF co
 
 The goal is to show an end-to-end autonomy slice that is small enough to understand but complete enough to run: a simulated rover, sensors, tracking, planning, control, evaluation, and a reproducible public repo.
 
-For a reviewer-friendly summary, see [docs/PROJECT_ONE_PAGER.md](docs/PROJECT_ONE_PAGER.md).
+For a reviewer-friendly summary, see [docs/PROJECT_ONE_PAGER.md](docs/PROJECT_ONE_PAGER.md)
+or the rendered [docs/PROJECT_ONE_PAGER.pdf](docs/PROJECT_ONE_PAGER.pdf). Regenerate the PDF
+with `python docs/render_project_one_pager_pdf.py`.

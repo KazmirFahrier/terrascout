@@ -49,7 +49,8 @@ The mission runner can use ground-truth pose, particle-filter pose, or EKF-SLAM 
 The stress benchmark currently runs worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes complete with 100% success and zero collisions.
 
 Per-layer design notes live in [docs/design](design/README.md), with reproducible PDF rendering
-via `python docs/design/render_design_pdfs.py`.
+via `python docs/design/render_design_pdfs.py`. This one-pager renders to
+`docs/PROJECT_ONE_PAGER.pdf` via `python docs/render_project_one_pager_pdf.py`.
 
 ## Reproduce
 
@@ -75,6 +76,7 @@ python benchmarks/slam_benchmark.py
 python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
 python docs/design/render_design_pdfs.py
+python docs/render_project_one_pager_pdf.py
 python -m pytest
 ```
 
