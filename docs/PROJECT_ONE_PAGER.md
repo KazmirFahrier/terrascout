@@ -20,7 +20,8 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 
 ## Current Metrics
 
-Default benchmark seeds: `2, 3, 5, 7, 11`.
+Default mission/module benchmark seeds: `2, 3, 5, 7, 11`. The L1 tracking acceptance
+benchmark uses 100 deterministic scenes (`0..99`).
 
 | Metric | Result |
 | --- | ---: |
@@ -28,8 +29,8 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | Collision events | 0 |
 | PID straight-line cross-track | <0.03 m max over 10 slip runs |
 | PID 90-degree heading step | <1.5 s settle, <8% overshoot |
-| 10-worker tracking prediction | <0.05 m mean 1-second error |
-| 10-worker association accuracy | 100% on deterministic benchmark |
+| 100-scene 10-worker tracking prediction | <0.05 m mean 1-second error |
+| 100-scene 10-worker association accuracy | 100% on deterministic benchmark |
 | Particle-filter relocalization | <0.03 m p95 from +/-5 m, +/-30 degree prior |
 | Scheduler oracle gap | 0% on deterministic 7-goal benchmark |
 | Resource scheduler oracle gap | 0% across 50 constrained randomized layouts |

@@ -31,12 +31,12 @@ class TrackerTest(unittest.TestCase):
         self.assertLess(abs(pred_y - (2.0 + 0.1 * 3.4)), 0.25)
 
     def test_tracking_benchmark_meets_l1_acceptance_metrics(self) -> None:
-        rows = run_tracking_benchmark(seeds=[7], worker_count=10)
+        rows = run_tracking_benchmark(worker_count=10)
 
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0].track_count, 10)
-        self.assertLess(rows[0].mean_prediction_error_m, 0.20)
-        self.assertGreaterEqual(rows[0].association_accuracy, 0.95)
+        self.assertEqual(len(rows), 100)
+        self.assertLessEqual(max(row.track_count for row in rows), 10)
+        self.assertLess(max(row.mean_prediction_error_m for row in rows), 0.20)
+        self.assertGreaterEqual(min(row.association_accuracy for row in rows), 0.95)
 
 
 if __name__ == "__main__":

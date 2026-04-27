@@ -81,7 +81,7 @@ Benchmark output is written to `artifacts/benchmark.csv`.
 
 L0 control benchmark output is written to `artifacts/control_benchmark.csv`. It evaluates 10 randomized slip/friction runs for straight-line cross-track error, 90-degree heading-settle time, and heading overshoot.
 
-L1 tracking benchmark output is written to `artifacts/tracking_benchmark.csv`. The benchmark evaluates 10 simultaneous moving workers over deterministic seeded scenes and reports 1-second prediction error plus ID-continuity association accuracy.
+L1 tracking benchmark output is written to `artifacts/tracking_benchmark.csv`. The benchmark evaluates 10 simultaneous moving workers across 100 deterministic scenes and reports 1-second prediction error plus ID-continuity association accuracy.
 
 L2 localization benchmark output is written to `artifacts/localization_benchmark.csv`. It evaluates particle-filter relocalization from a +/-5 m, +/-30 degree pose prior and reports prior error, mean/p95 final pose error, and particle count.
 

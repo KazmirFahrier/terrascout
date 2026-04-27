@@ -142,6 +142,7 @@ class StressSummaryRow:
 
 
 DEFAULT_BENCHMARK_SEEDS = [2, 3, 5, 7, 11]
+TRACKING_ACCEPTANCE_SEEDS = list(range(100))
 DEFAULT_STRESS_SEEDS = [2, 7, 11]
 DEFAULT_ACCEPTANCE_SEEDS = [
     2,
@@ -312,10 +313,10 @@ def run_tracking_benchmark(
     steps: int = 80,
     dt: float = 0.1,
 ) -> list[TrackingBenchmarkRow]:
-    """Evaluate 1-second worker prediction and ID continuity for up to 10 agents."""
+    """Evaluate 1-second worker prediction and ID continuity across 100 scenes."""
 
     rows: list[TrackingBenchmarkRow] = []
-    for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
+    for seed in list(seeds or TRACKING_ACCEPTANCE_SEEDS):
         started = perf_counter()
         rng = np.random.default_rng(seed)
         positions = _initial_worker_positions(rng, worker_count)
