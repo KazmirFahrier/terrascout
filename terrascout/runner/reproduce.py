@@ -148,6 +148,7 @@ def build_reproduce_summary(
                     [row.wall_time_ms for row in planner_rows if row.planner == "hybrid_astar"]
                 ),
             },
+            "planner_mean_steering_reduction_percent": _planner_steering_reduction(planner_rows),
             "slam_mean_landmarks": _mean([row.landmark_count for row in slam_rows]),
             "stress_modes": [asdict(row) for row in stress_rows],
         },
@@ -170,6 +171,14 @@ def _percentile(values: list[float], percentile_value: float) -> float:
     upper = min(lower + 1, len(sorted_values) - 1)
     weight = rank - lower
     return sorted_values[lower] * (1.0 - weight) + sorted_values[upper] * weight
+
+
+def _planner_steering_reduction(rows: list[PlannerBenchmarkRow]) -> float:
+    grid_effort = _mean([row.steering_effort_rad for row in rows if row.planner == "grid_astar"])
+    hybrid_effort = _mean([row.steering_effort_rad for row in rows if row.planner == "hybrid_astar"])
+    if grid_effort <= 0.0:
+        return 0.0
+    return max(0.0, (grid_effort - hybrid_effort) / grid_effort * 100.0)
 
 
 def main() -> None:

@@ -56,8 +56,8 @@ class ReproduceSummaryTest(unittest.TestCase):
             localization_rows=[LocalizationBenchmarkRow(7, 0.5, 5.0, 0.12, 1350, 4.0)],
             scheduler_rows=[SchedulerBenchmarkRow(7, 7, 10.0, 10.0, 0.0, 8, 5.0)],
             planner_rows=[
-                PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 8.0),
-                PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 55.0),
+                PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 10.0, 8.0),
+                PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 4.0, 55.0),
             ],
             slam_rows=[SlamBenchmarkRow(7, 50, 1.5, 2.0, 3.0)],
             stress_rows=[StressSummaryRow("grid_truth", "grid", "truth", 3, 1.0, 0, 0.2, 0.4, 0)],
@@ -74,6 +74,10 @@ class ReproduceSummaryTest(unittest.TestCase):
         self.assertEqual(
             summary["benchmark_summary"]["planner_mean_wall_time_ms"]["hybrid_astar"],
             55.0,
+        )
+        self.assertEqual(
+            summary["benchmark_summary"]["planner_mean_steering_reduction_percent"],
+            60.0,
         )
         self.assertEqual(summary["outputs"]["mission_trace_json"], "artifacts/mission_trace.json")
 

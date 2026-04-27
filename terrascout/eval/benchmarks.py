@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from dataclasses import asdict, dataclass
 from itertools import permutations
-from math import hypot, pi
+from math import atan2, hypot, pi
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Sequence
@@ -32,6 +32,7 @@ class PlannerBenchmarkRow:
     planner: str
     waypoint_count: int
     path_length_m: float
+    steering_effort_rad: float
     wall_time_ms: float
 
 
@@ -178,6 +179,7 @@ def run_planner_benchmark(
                 planner="grid_astar",
                 waypoint_count=len(grid_path),
                 path_length_m=_point_length(grid_path),
+                steering_effort_rad=_point_steering_effort(grid_path, start.theta),
                 wall_time_ms=(perf_counter() - started) * 1000.0,
             )
         )
@@ -191,6 +193,7 @@ def run_planner_benchmark(
                 planner="hybrid_astar",
                 waypoint_count=len(hybrid_path),
                 path_length_m=_point_length(hybrid_path),
+                steering_effort_rad=_pose_steering_effort(hybrid_path),
                 wall_time_ms=(perf_counter() - started) * 1000.0,
             )
         )
@@ -442,6 +445,25 @@ def run_stress_benchmark(
 
 def _point_length(points: Sequence[Point2D | Pose2D]) -> float:
     return sum(hypot(b.x - a.x, b.y - a.y) for a, b in zip(points, points[1:]))
+
+
+def _point_steering_effort(points: Sequence[Point2D], start_theta: float) -> float:
+    effort = 0.0
+    previous_heading = start_theta
+    previous = points[0] if points else Point2D(0.0, 0.0)
+    for point in points:
+        dx = point.x - previous.x
+        dy = point.y - previous.y
+        if dx * dx + dy * dy > 1e-9:
+            heading = atan2(dy, dx)
+            effort += abs(wrap_angle(heading - previous_heading))
+            previous_heading = heading
+        previous = point
+    return effort
+
+
+def _pose_steering_effort(poses: Sequence[Pose2D]) -> float:
+    return sum(abs(wrap_angle(b.theta - a.theta)) for a, b in zip(poses, poses[1:]))
 
 
 def _straight_line_cross_track_error(slip_fraction: float) -> float:

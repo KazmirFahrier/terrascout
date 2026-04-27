@@ -18,7 +18,13 @@ def main() -> None:
     rows = run()
     grid_mean = sum(row.wall_time_ms for row in rows if row.planner == "grid_astar") / 5.0
     hybrid_mean = sum(row.wall_time_ms for row in rows if row.planner == "hybrid_astar") / 5.0
-    print(f"grid_mean_ms={grid_mean:.2f} hybrid_mean_ms={hybrid_mean:.2f}")
+    grid_effort = sum(row.steering_effort_rad for row in rows if row.planner == "grid_astar") / 5.0
+    hybrid_effort = sum(row.steering_effort_rad for row in rows if row.planner == "hybrid_astar") / 5.0
+    reduction = (grid_effort - hybrid_effort) / grid_effort if grid_effort else 0.0
+    print(
+        f"grid_mean_ms={grid_mean:.2f} hybrid_mean_ms={hybrid_mean:.2f} "
+        f"steering_reduction={reduction:.3f}"
+    )
 
 
 if __name__ == "__main__":

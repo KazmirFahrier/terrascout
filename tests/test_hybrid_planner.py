@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from math import atan2, hypot
 
+from terrascout.eval.benchmarks import run_planner_benchmark
 from terrascout.plan.hybrid_astar import HybridAStarPlanner, HybridPlannerConfig
 from terrascout.sim.geometry import Pose2D, distance, wrap_angle
 from terrascout.sim.world import OrchardWorld, ScenarioConfig
@@ -35,7 +36,13 @@ class HybridAStarPlannerTest(unittest.TestCase):
             if hypot(nxt.x - current.x, nxt.y - current.y) > 0.2:
                 self.assertLess(abs(wrap_angle(segment - current.theta)), 1.8)
 
+    def test_planner_benchmark_reduces_steering_effort(self) -> None:
+        rows = run_planner_benchmark(seeds=[7])
+        grid_effort = next(row.steering_effort_rad for row in rows if row.planner == "grid_astar")
+        hybrid_effort = next(row.steering_effort_rad for row in rows if row.planner == "hybrid_astar")
+
+        self.assertLess(hybrid_effort, 0.7 * grid_effort)
+
 
 if __name__ == "__main__":
     unittest.main()
-
