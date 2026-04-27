@@ -10,6 +10,7 @@ from typing import Any
 
 from terrascout.eval.benchmarks import (
     ControlBenchmarkRow,
+    EndToEndBenchmarkRow,
     LocalizationBenchmarkRow,
     PlannerBenchmarkRow,
     SchedulerBenchmarkRow,
@@ -18,6 +19,7 @@ from terrascout.eval.benchmarks import (
     TrackingBenchmarkRow,
     run_mission_benchmark,
     run_control_benchmark,
+    run_end_to_end_benchmark,
     run_localization_benchmark,
     run_planner_benchmark,
     run_scheduler_benchmark,
@@ -61,6 +63,7 @@ def run_reproduce(
     scheduler_rows = run_scheduler_benchmark(artifacts_dir / "scheduler_benchmark.csv")
     planner_rows = run_planner_benchmark(artifacts_dir / "planner_benchmark.csv")
     slam_rows = run_slam_benchmark(artifacts_dir / "slam_benchmark.csv")
+    end_to_end_rows = run_end_to_end_benchmark(artifacts_dir / "end_to_end_benchmark.csv")
     stress_rows = run_stress_benchmark(
         detail_output=artifacts_dir / "stress_benchmark_detail.csv",
         summary_output=artifacts_dir / "stress_benchmark_summary.csv",
@@ -76,6 +79,7 @@ def run_reproduce(
         scheduler_rows=scheduler_rows,
         planner_rows=planner_rows,
         slam_rows=slam_rows,
+        end_to_end_rows=end_to_end_rows,
         stress_rows=stress_rows,
         outputs=outputs,
     )
@@ -95,6 +99,7 @@ def build_reproduce_summary(
     scheduler_rows: list[SchedulerBenchmarkRow],
     planner_rows: list[PlannerBenchmarkRow],
     slam_rows: list[SlamBenchmarkRow],
+    end_to_end_rows: list[EndToEndBenchmarkRow],
     stress_rows: list[StressSummaryRow],
     outputs: dict[str, Path],
 ) -> dict[str, Any]:
@@ -153,6 +158,18 @@ def build_reproduce_summary(
             "slam_mean_pose_error_m": _mean([row.final_pose_error_m for row in slam_rows]),
             "slam_mean_landmark_error_m": _mean([row.mean_landmark_error_m for row in slam_rows]),
             "slam_p95_landmark_error_m": _mean([row.p95_landmark_error_m for row in slam_rows]),
+            "end_to_end_runs": len(end_to_end_rows),
+            "end_to_end_rows": max((row.rows for row in end_to_end_rows), default=0),
+            "end_to_end_priority_goals": max(
+                (row.priority_goals for row in end_to_end_rows),
+                default=0,
+            ),
+            "end_to_end_mean_success_rate": _mean([row.success_rate for row in end_to_end_rows]),
+            "end_to_end_total_collisions": sum(row.collisions for row in end_to_end_rows),
+            "end_to_end_max_wall_time_s": max(
+                (row.wall_time_s for row in end_to_end_rows),
+                default=0.0,
+            ),
             "stress_modes": [asdict(row) for row in stress_rows],
         },
         "outputs": {name: str(path) for name, path in outputs.items()},

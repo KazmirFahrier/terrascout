@@ -90,6 +90,23 @@ class SchedulerBenchmarkRow:
 
 
 @dataclass(frozen=True)
+class EndToEndBenchmarkRow:
+    seed: int
+    rows: int
+    trees_per_row: int
+    worker_count: int
+    priority_goals: int
+    inspected_goals: int
+    success_rate: float
+    collisions: int
+    mission_time_s: float
+    wall_time_s: float
+    mean_localization_error_m: float
+    scheduler_dropped_goals: int
+    replans: int
+
+
+@dataclass(frozen=True)
 class StressScenario:
     name: str
     planner: str
@@ -112,6 +129,7 @@ class StressSummaryRow:
 
 DEFAULT_BENCHMARK_SEEDS = [2, 3, 5, 7, 11]
 DEFAULT_STRESS_SEEDS = [2, 7, 11]
+DEFAULT_ACCEPTANCE_SEEDS = [2, 7, 11]
 DEFAULT_STRESS_SCENARIOS = [
     StressScenario("grid_truth", "grid", "truth"),
     StressScenario("grid_particle", "grid", "particle"),
@@ -446,6 +464,50 @@ def run_stress_benchmark(
 
     _write_csv(summary_rows, summary_output)
     return summary_rows
+
+
+def run_end_to_end_benchmark(
+    output: Path = Path("artifacts/end_to_end_benchmark.csv"),
+    seeds: Sequence[int] | None = None,
+    rows: int = 30,
+    trees_per_row: int = 14,
+    worker_count: int = 1,
+    priority_goals: int = 10,
+) -> list[EndToEndBenchmarkRow]:
+    """Run a 30-row priority-pass acceptance benchmark."""
+
+    benchmark_rows: list[EndToEndBenchmarkRow] = []
+    for seed in list(seeds or DEFAULT_ACCEPTANCE_SEEDS):
+        metrics = run_mission(
+            seed=seed,
+            rows=rows,
+            trees_per_row=trees_per_row,
+            worker_count=worker_count,
+            max_steps=9000,
+            battery_budget_m=700.0,
+            daylight_budget_s=900.0,
+            max_goals=priority_goals,
+        )
+        benchmark_rows.append(
+            EndToEndBenchmarkRow(
+                seed=seed,
+                rows=rows,
+                trees_per_row=trees_per_row,
+                worker_count=worker_count,
+                priority_goals=priority_goals,
+                inspected_goals=metrics.inspected_rows,
+                success_rate=metrics.success_rate,
+                collisions=metrics.collisions,
+                mission_time_s=metrics.mission_time_s,
+                wall_time_s=metrics.wall_time_s,
+                mean_localization_error_m=metrics.mean_localization_error_m,
+                scheduler_dropped_goals=metrics.scheduler_dropped_goals,
+                replans=metrics.replans,
+            )
+        )
+
+    _write_csv(benchmark_rows, output)
+    return benchmark_rows
 
 
 def _point_length(points: Sequence[Point2D | Pose2D]) -> float:

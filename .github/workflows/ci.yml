@@ -24,4 +24,5 @@ jobs:
       - run: python benchmarks/scheduler_benchmark.py
       - run: python benchmarks/planner_benchmark.py
       - run: python benchmarks/slam_benchmark.py
+      - run: python benchmarks/end_to_end_benchmark.py
       - run: python benchmarks/stress_benchmark.py

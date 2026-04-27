@@ -5,6 +5,7 @@ import unittest
 
 from terrascout.eval.benchmarks import (
     ControlBenchmarkRow,
+    EndToEndBenchmarkRow,
     LocalizationBenchmarkRow,
     PlannerBenchmarkRow,
     SchedulerBenchmarkRow,
@@ -60,6 +61,9 @@ class ReproduceSummaryTest(unittest.TestCase):
                 PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 4.0, 55.0),
             ],
             slam_rows=[SlamBenchmarkRow(7, 50, 1.5, 0.04, 0.08, 0.15, 2.0, 3.0)],
+            end_to_end_rows=[
+                EndToEndBenchmarkRow(7, 30, 14, 1, 10, 10, 1.0, 0, 42.0, 8.5, 0.2, 0, 12)
+            ],
             stress_rows=[StressSummaryRow("grid_truth", "grid", "truth", 3, 1.0, 0, 0.2, 0.4, 0)],
             outputs={"mission_trace_json": Path("artifacts/mission_trace.json")},
         )
@@ -80,6 +84,8 @@ class ReproduceSummaryTest(unittest.TestCase):
             60.0,
         )
         self.assertEqual(summary["benchmark_summary"]["slam_mean_pose_error_m"], 0.04)
+        self.assertEqual(summary["benchmark_summary"]["end_to_end_rows"], 30)
+        self.assertEqual(summary["benchmark_summary"]["end_to_end_total_collisions"], 0)
         self.assertEqual(summary["outputs"]["mission_trace_json"], "artifacts/mission_trace.json")
 
 

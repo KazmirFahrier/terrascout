@@ -45,6 +45,7 @@ python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.jso
 python -m terrascout.runner.mission --scenario scenarios/default_orchard.json --trace artifacts/scenario_trace.json
 python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/hybrid_trace.json
 python -m terrascout.runner.mission --seed 7 --pose-source particle --trace artifacts/particle_trace.json
+python -m terrascout.runner.mission --rows 30 --max-goals 10 --battery-budget-m 700 --daylight-budget-s 900 --trace artifacts/large_trace.json
 python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
 python benchmarks/run_benchmark.py
 python benchmarks/control_benchmark.py
@@ -53,6 +54,7 @@ python benchmarks/localization_benchmark.py
 python benchmarks/scheduler_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
+python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
 python -m pytest
 ```
@@ -86,6 +88,8 @@ Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers a
 Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* averaged ~55 ms per plan while returning sparse heading-aware pose paths with >80% lower steering effort.
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 39 tree landmarks and reports final pose plus landmark-map error against ground truth.
+
+End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs a 30-row orchard priority pass with 10 scheduled inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans.
 
 Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 
@@ -122,7 +126,7 @@ Runtime flow:
 
 - Stress-test estimated-pose control across larger randomized scenario suites.
 - Use Hybrid A* as the default mission planner after more stress testing.
-- Extend the scheduler with battery/time/priority state.
+- Extend the 30-row acceptance suite from the current 3 seeded runs to the full 20-mission challenge target.
 - Expand tests into coverage-gated CI.
 
 ## Why This Exists

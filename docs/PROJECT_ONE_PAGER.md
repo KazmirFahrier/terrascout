@@ -37,6 +37,7 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | Mean localization error | ~0.19 m |
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |
+| 30-row acceptance pass | 10/10 priority goals, 0 collisions on current 3-seed suite |
 | Final battery SOC | ~90% |
 | Mean mission wall time | ~3.0 s |
 | Runtime safety layer | Reports interventions, stops, and minimum perceived worker clearance |
@@ -65,6 +66,7 @@ python benchmarks/localization_benchmark.py
 python benchmarks/scheduler_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
+python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
 python -m pytest
 ```
@@ -73,5 +75,5 @@ python -m pytest
 
 - Stress-test KLD-adaptive particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
-- Add battery discharge and recharge stations to the mission simulator.
+- Expand the 30-row acceptance suite from the current 3 seeded runs to the full 20-mission challenge target.
 - Add coverage badges, richer demo GIFs, and a short narrated demo video.

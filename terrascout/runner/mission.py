@@ -75,6 +75,9 @@ def run_mission(
     dt: float = 0.05,
     planner_kind: str = "grid",
     pose_source: str = "truth",
+    battery_budget_m: float = 140.0,
+    daylight_budget_s: float = 180.0,
+    max_goals: int | None = None,
     scenario_config: ScenarioConfig | None = None,
     trace_path: Path | None = None,
 ) -> MissionMetrics:
@@ -106,18 +109,22 @@ def run_mission(
 
     if pose_source not in {"truth", "particle", "slam"}:
         raise ValueError(f"Unsupported pose_source: {pose_source}")
+    if max_goals is not None and max_goals < 0:
+        raise ValueError("max_goals must be non-negative")
 
     scheduler = InspectionScheduler()
     priorities = [1.0 + 0.25 * (idx % 3) for idx in range(len(world.row_goals))]
+    candidate_goals = world.row_goals[:max_goals] if max_goals is not None else world.row_goals
+    candidate_priorities = priorities[:max_goals] if max_goals is not None else priorities
     schedule = scheduler.plan_with_resources(
         rover.pose,
-        world.row_goals,
-        priorities=priorities,
-        battery_budget_m=140.0,
-        daylight_budget_s=180.0,
+        candidate_goals,
+        priorities=candidate_priorities,
+        battery_budget_m=battery_budget_m,
+        daylight_budget_s=daylight_budget_s,
     )
     ordered_goal_indices = schedule.order
-    goals = [world.row_goals[idx] for idx in ordered_goal_indices]
+    goals = [candidate_goals[idx] for idx in ordered_goal_indices]
     current_goal_idx = 0
     current_path: list[Point2D] = []
     current_waypoint_idx = 0
@@ -296,6 +303,9 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--planner", choices=["grid", "hybrid"], default="grid")
     parser.add_argument("--pose-source", choices=["truth", "particle", "slam"], default="truth")
+    parser.add_argument("--battery-budget-m", type=float, default=140.0)
+    parser.add_argument("--daylight-budget-s", type=float, default=180.0)
+    parser.add_argument("--max-goals", type=int, default=None)
     parser.add_argument("--scenario", type=Path, default=None)
     parser.add_argument("--trace", type=Path, default=Path("artifacts/mission_trace.json"))
     parser.add_argument("--csv", type=Path, default=None)
@@ -308,6 +318,9 @@ def main() -> None:
         worker_count=args.workers,
         planner_kind=args.planner,
         pose_source=args.pose_source,
+        battery_budget_m=args.battery_budget_m,
+        daylight_budget_s=args.daylight_budget_s,
+        max_goals=args.max_goals,
         scenario_config=load_scenario_config(args.scenario) if args.scenario is not None else None,
         trace_path=args.trace,
     )

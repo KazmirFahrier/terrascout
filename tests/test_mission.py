@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from terrascout.eval.benchmarks import run_end_to_end_benchmark
 from terrascout.runner.mission import run_mission
 from terrascout.sim.world import ScenarioConfig
 
@@ -61,6 +62,34 @@ class MissionTest(unittest.TestCase):
         self.assertEqual(metrics.seed, 13)
         self.assertGreater(metrics.total_rows, 0)
         self.assertEqual(metrics.collisions, 0)
+
+    def test_mission_accepts_resource_budget_and_goal_limit(self) -> None:
+        metrics = run_mission(
+            seed=7,
+            rows=12,
+            worker_count=0,
+            battery_budget_m=300.0,
+            daylight_budget_s=500.0,
+            max_goals=4,
+        )
+
+        self.assertEqual(metrics.total_rows, 4)
+        self.assertEqual(metrics.inspected_rows, 4)
+        self.assertEqual(metrics.scheduler_dropped_goals, 0)
+        self.assertGreater(metrics.battery_remaining_m, 0.0)
+
+    def test_end_to_end_benchmark_reports_acceptance_rows(self) -> None:
+        rows = run_end_to_end_benchmark(
+            seeds=[7],
+            rows=8,
+            trees_per_row=10,
+            worker_count=0,
+            priority_goals=3,
+        )
+
+        self.assertEqual(rows[0].priority_goals, 3)
+        self.assertEqual(rows[0].inspected_goals, 3)
+        self.assertEqual(rows[0].collisions, 0)
 
 
 if __name__ == "__main__":
