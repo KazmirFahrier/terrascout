@@ -33,6 +33,7 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | Particle-filter pose refinement | <0.15 m p95 on coarse-prior benchmark |
 | Scheduler oracle gap | 0% on deterministic 7-goal benchmark |
 | Hybrid A* steering effort | >80% lower than grid A* baseline |
+| EKF-SLAM map accuracy | <0.10 m mean landmark error on deterministic traversal |
 | Mean localization error | ~0.19 m |
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |

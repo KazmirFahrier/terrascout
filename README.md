@@ -85,7 +85,7 @@ Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers a
 
 Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* averaged ~55 ms per plan while returning sparse heading-aware pose paths with >80% lower steering effort.
 
-SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 49 tree landmarks in ~2.5 ms per seeded run.
+SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 39 tree landmarks and reports final pose plus landmark-map error against ground truth.
 
 Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 

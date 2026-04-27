@@ -4,6 +4,7 @@ import unittest
 
 import numpy as np
 
+from terrascout.eval.benchmarks import run_slam_benchmark
 from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.sim.geometry import Pose2D, distance
 from terrascout.sim.world import OrchardWorld, ScenarioConfig
@@ -32,7 +33,14 @@ class EkfSlamTest(unittest.TestCase):
 
         self.assertLess(distance(slam.pose, Pose2D(1.0, 0.0, 0.0)), 0.05)
 
+    def test_slam_benchmark_reports_pose_and_landmark_accuracy(self) -> None:
+        rows = run_slam_benchmark(seeds=[7])
+
+        self.assertGreater(rows[0].landmark_count, 30)
+        self.assertLess(rows[0].final_pose_error_m, 0.15)
+        self.assertLess(rows[0].mean_landmark_error_m, 0.10)
+        self.assertLess(rows[0].p95_landmark_error_m, 0.20)
+
 
 if __name__ == "__main__":
     unittest.main()
-

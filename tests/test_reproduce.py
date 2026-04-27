@@ -59,7 +59,7 @@ class ReproduceSummaryTest(unittest.TestCase):
                 PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 10.0, 8.0),
                 PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 4.0, 55.0),
             ],
-            slam_rows=[SlamBenchmarkRow(7, 50, 1.5, 2.0, 3.0)],
+            slam_rows=[SlamBenchmarkRow(7, 50, 1.5, 0.04, 0.08, 0.15, 2.0, 3.0)],
             stress_rows=[StressSummaryRow("grid_truth", "grid", "truth", 3, 1.0, 0, 0.2, 0.4, 0)],
             outputs={"mission_trace_json": Path("artifacts/mission_trace.json")},
         )
@@ -79,6 +79,7 @@ class ReproduceSummaryTest(unittest.TestCase):
             summary["benchmark_summary"]["planner_mean_steering_reduction_percent"],
             60.0,
         )
+        self.assertEqual(summary["benchmark_summary"]["slam_mean_pose_error_m"], 0.04)
         self.assertEqual(summary["outputs"]["mission_trace_json"], "artifacts/mission_trace.json")
 
 

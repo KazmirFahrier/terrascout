@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from dataclasses import asdict, dataclass
 from itertools import permutations
-from math import atan2, hypot, pi
+from math import atan2, cos, hypot, pi, sin
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Sequence
@@ -51,6 +51,9 @@ class SlamBenchmarkRow:
     seed: int
     landmark_count: int
     mean_observations: float
+    final_pose_error_m: float
+    mean_landmark_error_m: float
+    p95_landmark_error_m: float
     covariance_trace: float
     wall_time_ms: float
 
@@ -209,35 +212,37 @@ def run_slam_benchmark(
     """Run a deterministic EKF-SLAM smoke benchmark."""
 
     rows: list[SlamBenchmarkRow] = []
-    poses = [
-        Pose2D(2.0, 2.0, 0.8),
-        Pose2D(5.5, 7.0, 1.3),
-        Pose2D(9.0, 12.0, 1.7),
-        Pose2D(12.0, 18.0, 1.5),
+    commands = [
+        (0.9, 0.0, 8),
+        (0.8, 0.18, 8),
+        (0.9, 0.0, 8),
+        (0.8, -0.18, 8),
+        (0.9, 0.0, 8),
     ]
     for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
-        world = OrchardWorld(ScenarioConfig(rows=6, trees_per_row=10, worker_count=0, random_seed=seed))
-        slam = EkfSlam(poses[0])
+        world = OrchardWorld(ScenarioConfig(rows=8, trees_per_row=14, worker_count=0, random_seed=seed))
+        truth = Pose2D(2.0, 1.5, 1.1)
+        slam = EkfSlam(truth)
         started = perf_counter()
-        previous = poses[0]
-        for pose in poses:
-            slam.predict(
-                linear_mps=((pose.x - previous.x) ** 2 + (pose.y - previous.y) ** 2) ** 0.5,
-                angular_rps=pose.theta - previous.theta,
-                dt=1.0,
-            )
-            slam.update(world.local_lidar_detections(pose, include_workers=False))
-            previous = pose
+        for linear_mps, angular_rps, steps in commands:
+            for _ in range(steps):
+                truth = _slam_truth_step(truth, linear_mps, angular_rps, dt=0.5)
+                slam.predict(linear_mps=linear_mps, angular_rps=angular_rps, dt=0.5)
+                slam.update(world.local_lidar_detections(truth, include_workers=False))
         mean_observations = (
             sum(slam.landmark_observations) / len(slam.landmark_observations)
             if slam.landmark_observations
             else 0.0
         )
+        landmark_errors = _landmark_errors(slam.landmarks(), world.trees)
         rows.append(
             SlamBenchmarkRow(
                 seed=seed,
                 landmark_count=slam.landmark_count,
                 mean_observations=mean_observations,
+                final_pose_error_m=distance(slam.pose, truth),
+                mean_landmark_error_m=_mean(landmark_errors),
+                p95_landmark_error_m=percentile(landmark_errors, 95),
                 covariance_trace=float(slam.covariance.trace()),
                 wall_time_ms=(perf_counter() - started) * 1000.0,
             )
@@ -464,6 +469,22 @@ def _point_steering_effort(points: Sequence[Point2D], start_theta: float) -> flo
 
 def _pose_steering_effort(poses: Sequence[Pose2D]) -> float:
     return sum(abs(wrap_angle(b.theta - a.theta)) for a, b in zip(poses, poses[1:]))
+
+
+def _slam_truth_step(pose: Pose2D, linear_mps: float, angular_rps: float, dt: float) -> Pose2D:
+    theta_mid = pose.theta + 0.5 * angular_rps * dt
+    return Pose2D(
+        x=pose.x + linear_mps * cos(theta_mid) * dt,
+        y=pose.y + linear_mps * sin(theta_mid) * dt,
+        theta=wrap_angle(pose.theta + angular_rps * dt),
+    )
+
+
+def _landmark_errors(estimated: Sequence[Point2D], truth: Sequence[Point2D]) -> list[float]:
+    return [
+        min(hypot(landmark.x - tree.x, landmark.y - tree.y) for tree in truth)
+        for landmark in estimated
+    ]
 
 
 def _straight_line_cross_track_error(slip_fraction: float) -> float:

@@ -17,8 +17,15 @@ def run(output: Path = Path("artifacts/slam_benchmark.csv")) -> list[SlamBenchma
 def main() -> None:
     rows = run()
     mean_landmarks = sum(row.landmark_count for row in rows) / len(rows)
+    mean_pose_error = sum(row.final_pose_error_m for row in rows) / len(rows)
+    mean_landmark_error = sum(row.mean_landmark_error_m for row in rows) / len(rows)
     mean_wall = sum(row.wall_time_ms for row in rows) / len(rows)
-    print(f"mean_landmarks={mean_landmarks:.1f} mean_wall_ms={mean_wall:.2f}")
+    print(
+        f"mean_landmarks={mean_landmarks:.1f} "
+        f"mean_pose_error_m={mean_pose_error:.3f} "
+        f"mean_landmark_error_m={mean_landmark_error:.3f} "
+        f"mean_wall_ms={mean_wall:.2f}"
+    )
 
 
 if __name__ == "__main__":
