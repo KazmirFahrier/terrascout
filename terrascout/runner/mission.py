@@ -40,6 +40,7 @@ class MissionMetrics:
     slam_covariance_trace: float
     mean_localization_error_m: float
     planner: str
+    pose_source: str
     scheduler_value: float
     scheduler_dropped_goals: int
     battery_remaining_m: float
@@ -64,6 +65,7 @@ def run_mission(
     max_steps: int = 4200,
     dt: float = 0.05,
     planner_kind: str = "grid",
+    pose_source: str = "truth",
     trace_path: Path | None = None,
 ) -> MissionMetrics:
     """Run a complete deterministic orchard-inspection mission."""
@@ -91,6 +93,9 @@ def run_mission(
     grid_planner = GridAStarPlanner(world)
     hybrid_planner = HybridAStarPlanner(world)
 
+    if pose_source not in {"truth", "particle", "slam"}:
+        raise ValueError(f"Unsupported pose_source: {pose_source}")
+
     scheduler = InspectionScheduler()
     priorities = [1.0 + 0.25 * (idx % 3) for idx in range(len(world.row_goals))]
     schedule = scheduler.plan_with_resources(
@@ -116,6 +121,7 @@ def run_mission(
     trace = MissionTrace(poses=[], goals=[(goal.x, goal.y) for goal in goals], workers=[])
 
     for step in range(max_steps):
+        navigation_pose = _navigation_pose(pose_source, rover.pose, localizer.estimate(), slam.pose)
         detections = world.lidar_detections(rover.pose, include_workers=True, include_trees=True)
         local_detections = world.local_lidar_detections(rover.pose, include_workers=True, include_trees=True)
         tracker.update(detections, dt)
@@ -133,14 +139,14 @@ def run_mission(
         if not current_path or current_waypoint_idx >= len(current_path) or step % 100 == 0:
             if planner_kind == "hybrid":
                 hybrid_path = hybrid_planner.plan(
-                    rover.pose,
+                    navigation_pose,
                     Pose2D(goal.x, goal.y, 0.0),
                     predicted_workers=tracker.predicted_positions(horizon_s=1.0),
                 )
                 current_path = [Point2D(pose.x, pose.y) for pose in hybrid_path]
             else:
                 current_path = grid_planner.plan(
-                    rover.pose,
+                    navigation_pose,
                     goal,
                     predicted_workers=tracker.predicted_positions(horizon_s=1.0),
                 )
@@ -148,7 +154,7 @@ def run_mission(
             replans += 1
 
         waypoint = current_path[current_waypoint_idx]
-        if distance(rover.pose, waypoint) < 0.38 and current_waypoint_idx < len(current_path) - 1:
+        if distance(navigation_pose, waypoint) < 0.38 and current_waypoint_idx < len(current_path) - 1:
             current_waypoint_idx += 1
             waypoint = current_path[current_waypoint_idx]
 
@@ -159,7 +165,7 @@ def run_mission(
         if worker_clearance_m < 1.45:
             left, right = 0.0, 0.0
         else:
-            left, right = controller.wheel_commands(rover.pose, waypoint, dt)
+            left, right = controller.wheel_commands(navigation_pose, waypoint, dt)
         rover.command(left, right)
         localizer.predict(
             linear_mps=0.5 * (left + right),
@@ -210,6 +216,7 @@ def run_mission(
             localization_error_sum / localization_error_count if localization_error_count else 0.0
         ),
         planner=planner_kind,
+        pose_source=pose_source,
         scheduler_value=schedule.expected_value,
         scheduler_dropped_goals=schedule.dropped_goals,
         battery_remaining_m=schedule.battery_remaining_m,
@@ -220,6 +227,19 @@ def run_mission(
         trace_path.parent.mkdir(parents=True, exist_ok=True)
         trace_path.write_text(json.dumps({"metrics": asdict(metrics), "trace": asdict(trace)}, indent=2))
     return metrics
+
+
+def _navigation_pose(
+    pose_source: str,
+    truth_pose: Pose2D,
+    particle_pose: Pose2D,
+    slam_pose: Pose2D,
+) -> Pose2D:
+    if pose_source == "particle":
+        return particle_pose
+    if pose_source == "slam":
+        return slam_pose
+    return truth_pose
 
 
 def write_metrics_csv(metrics: list[MissionMetrics], output: Path) -> None:
@@ -240,6 +260,7 @@ def main() -> None:
     parser.add_argument("--trees-per-row", type=int, default=14)
     parser.add_argument("--workers", type=int, default=1)
     parser.add_argument("--planner", choices=["grid", "hybrid"], default="grid")
+    parser.add_argument("--pose-source", choices=["truth", "particle", "slam"], default="truth")
     parser.add_argument("--trace", type=Path, default=Path("artifacts/mission_trace.json"))
     parser.add_argument("--csv", type=Path, default=None)
     args = parser.parse_args()
@@ -250,6 +271,7 @@ def main() -> None:
         trees_per_row=args.trees_per_row,
         worker_count=args.workers,
         planner_kind=args.planner,
+        pose_source=args.pose_source,
         trace_path=args.trace,
     )
     print(json.dumps(asdict(metrics), indent=2))

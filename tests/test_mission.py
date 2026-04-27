@@ -29,6 +29,22 @@ class MissionTest(unittest.TestCase):
         self.assertEqual(metrics.planner, "hybrid")
         self.assertLess(metrics.wall_time_s, 5.0)
 
+    def test_particle_pose_source_mission_completes(self) -> None:
+        metrics = run_mission(seed=7, pose_source="particle")
+
+        self.assertEqual(metrics.inspected_rows, metrics.total_rows)
+        self.assertEqual(metrics.collisions, 0)
+        self.assertEqual(metrics.pose_source, "particle")
+        self.assertLess(metrics.mean_localization_error_m, 0.5)
+
+    def test_slam_pose_source_mission_completes(self) -> None:
+        metrics = run_mission(seed=7, pose_source="slam")
+
+        self.assertEqual(metrics.inspected_rows, metrics.total_rows)
+        self.assertEqual(metrics.collisions, 0)
+        self.assertEqual(metrics.pose_source, "slam")
+        self.assertGreater(metrics.slam_landmarks, 50)
+
 
 if __name__ == "__main__":
     unittest.main()

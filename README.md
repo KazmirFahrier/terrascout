@@ -21,7 +21,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Static PNG and animated GIF rendering for mission traces.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
 
-This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The current mission runner still uses ground-truth pose for closed-loop control and grid A* for its default routing path; richer closed-loop uncertainty handling is on the roadmap. Hybrid A* is available with `--planner hybrid`.
+This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The default mission uses ground-truth pose for the most stable demo path, but estimated-pose control is available with `--pose-source particle` or `--pose-source slam`. Hybrid A* is available with `--planner hybrid`.
 
 ## Quick Start
 
@@ -32,6 +32,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.json
 python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/hybrid_trace.json
+python -m terrascout.runner.mission --seed 7 --pose-source particle --trace artifacts/particle_trace.json
 python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
 python benchmarks/run_benchmark.py
 python benchmarks/planner_benchmark.py
@@ -49,9 +50,9 @@ python -m unittest discover -s tests
 
 Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
 
-| Seeds | Mean inspection success | Collision events | Mean localization error | Scheduler drops | Mean wall time |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | 100% | 0 | ~0.19 m | 0 | ~3.0 s |
+| Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Scheduler drops | Mean wall time |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | 0 | ~3.0 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -82,13 +83,12 @@ Runtime flow:
 4. The landmark mapper accumulates a tree map from range/bearing detections.
 5. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
 6. The planner builds an inflated occupancy grid from trees and predicted workers.
-7. The PID controller tracks the next waypoint.
+7. The PID controller tracks the next waypoint using truth, particle-filter, or EKF-SLAM pose.
 8. The mission runner records inspection, collision, mapping, EKF-SLAM, localization, path-length, and timing metrics.
 
 ## Roadmap
 
-- Use the particle-filter pose estimate directly in closed-loop control.
-- Use EKF-SLAM estimates directly in closed-loop planning and control.
+- Stress-test estimated-pose control across larger randomized scenario suites.
 - Use Hybrid A* as the default mission planner after more stress testing.
 - Extend the scheduler with battery/time/priority state.
 - Expand tests into coverage-gated CI.

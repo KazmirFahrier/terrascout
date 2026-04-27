@@ -28,6 +28,8 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | Scheduler dropped goals | 0 |
 | Mean mission wall time | ~3.0 s |
 
+The mission runner can use ground-truth pose, particle-filter pose, or EKF-SLAM pose for planning and waypoint control via `--pose-source truth|particle|slam`.
+
 ## Reproduce
 
 ```bash
@@ -40,8 +42,7 @@ python -m pytest
 
 ## Roadmap
 
-- Use particle-filter / EKF-SLAM pose estimates directly in closed-loop control.
+- Stress-test particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
 - Add battery discharge and recharge stations to the mission simulator.
 - Add coverage badges, richer demo GIFs, and a short narrated demo video.
-
