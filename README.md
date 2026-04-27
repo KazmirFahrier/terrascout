@@ -47,6 +47,7 @@ python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/
 python -m terrascout.runner.mission --seed 7 --pose-source particle --trace artifacts/particle_trace.json
 python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
 python benchmarks/run_benchmark.py
+python benchmarks/tracking_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
 python benchmarks/stress_benchmark.py
@@ -68,6 +69,8 @@ Run on a local laptop with the default configuration: 8 tree rows, 7 inspection 
 | 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | ~90% | ~3.2 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
+
+L1 tracking benchmark output is written to `artifacts/tracking_benchmark.csv`. The benchmark evaluates 10 simultaneous moving workers over deterministic seeded scenes and reports 1-second prediction error plus ID-continuity association accuracy.
 
 Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers around `ScenarioConfig`, so benchmark scenes can be reviewed and versioned without changing Python code.
 

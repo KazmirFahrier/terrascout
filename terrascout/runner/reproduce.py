@@ -12,10 +12,12 @@ from terrascout.eval.benchmarks import (
     PlannerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
+    TrackingBenchmarkRow,
     run_mission_benchmark,
     run_planner_benchmark,
     run_slam_benchmark,
     run_stress_benchmark,
+    run_tracking_benchmark,
 )
 from terrascout.runner.mission import MissionMetrics, run_mission, write_metrics_csv
 from terrascout.viz.render import render_animation, render_trace
@@ -47,6 +49,7 @@ def run_reproduce(
         outputs["mission_trace_gif"] = gif_path
 
     mission_rows = run_mission_benchmark(artifacts_dir / "benchmark.csv")
+    tracking_rows = run_tracking_benchmark(artifacts_dir / "tracking_benchmark.csv")
     planner_rows = run_planner_benchmark(artifacts_dir / "planner_benchmark.csv")
     slam_rows = run_slam_benchmark(artifacts_dir / "slam_benchmark.csv")
     stress_rows = run_stress_benchmark(
@@ -58,6 +61,7 @@ def run_reproduce(
         artifacts_dir=artifacts_dir,
         mission=mission,
         mission_rows=mission_rows,
+        tracking_rows=tracking_rows,
         planner_rows=planner_rows,
         slam_rows=slam_rows,
         stress_rows=stress_rows,
@@ -73,6 +77,7 @@ def build_reproduce_summary(
     artifacts_dir: Path,
     mission: MissionMetrics,
     mission_rows: list[MissionMetrics],
+    tracking_rows: list[TrackingBenchmarkRow],
     planner_rows: list[PlannerBenchmarkRow],
     slam_rows: list[SlamBenchmarkRow],
     stress_rows: list[StressSummaryRow],
@@ -87,6 +92,12 @@ def build_reproduce_summary(
             "mission_runs": len(mission_rows),
             "mission_mean_success_rate": _mean([row.success_rate for row in mission_rows]),
             "mission_total_collisions": sum(row.collisions for row in mission_rows),
+            "tracking_mean_prediction_error_m": _mean(
+                [row.mean_prediction_error_m for row in tracking_rows]
+            ),
+            "tracking_mean_association_accuracy": _mean(
+                [row.association_accuracy for row in tracking_rows]
+            ),
             "planner_mean_wall_time_ms": {
                 "grid_astar": _mean(
                     [row.wall_time_ms for row in planner_rows if row.planner == "grid_astar"]

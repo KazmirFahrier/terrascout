@@ -4,6 +4,7 @@ import unittest
 
 import numpy as np
 
+from terrascout.eval.benchmarks import run_tracking_benchmark
 from terrascout.sim.world import LidarDetection
 from terrascout.tracking.kalman import MultiObjectTracker
 
@@ -29,7 +30,14 @@ class TrackerTest(unittest.TestCase):
         self.assertLess(abs(pred_x - (1.0 + 0.4 * 3.4)), 0.25)
         self.assertLess(abs(pred_y - (2.0 + 0.1 * 3.4)), 0.25)
 
+    def test_tracking_benchmark_meets_l1_acceptance_metrics(self) -> None:
+        rows = run_tracking_benchmark(seeds=[7], worker_count=10)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].track_count, 10)
+        self.assertLess(rows[0].mean_prediction_error_m, 0.20)
+        self.assertGreaterEqual(rows[0].association_accuracy, 0.95)
+
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -9,12 +9,16 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any, Sequence
 
+import numpy as np
+from numpy.typing import NDArray
+
 from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.runner.mission import MissionMetrics, run_mission, write_metrics_csv
 from terrascout.sim.geometry import Point2D, Pose2D
-from terrascout.sim.world import OrchardWorld, ScenarioConfig
+from terrascout.sim.world import LidarDetection, OrchardWorld, ScenarioConfig
+from terrascout.tracking.kalman import MultiObjectTracker
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,16 @@ class SlamBenchmarkRow:
     landmark_count: int
     mean_observations: float
     covariance_trace: float
+    wall_time_ms: float
+
+
+@dataclass(frozen=True)
+class TrackingBenchmarkRow:
+    seed: int
+    worker_count: int
+    track_count: int
+    mean_prediction_error_m: float
+    association_accuracy: float
     wall_time_ms: float
 
 
@@ -166,6 +180,68 @@ def run_slam_benchmark(
     return rows
 
 
+def run_tracking_benchmark(
+    output: Path = Path("artifacts/tracking_benchmark.csv"),
+    seeds: Sequence[int] | None = None,
+    worker_count: int = 10,
+    steps: int = 80,
+    dt: float = 0.1,
+) -> list[TrackingBenchmarkRow]:
+    """Evaluate 1-second worker prediction and ID continuity for up to 10 agents."""
+
+    rows: list[TrackingBenchmarkRow] = []
+    for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
+        started = perf_counter()
+        rng = np.random.default_rng(seed)
+        positions = _initial_worker_positions(rng, worker_count)
+        velocities = np.column_stack(
+            [
+                rng.uniform(-0.25, 0.25, worker_count),
+                rng.uniform(-0.20, 0.20, worker_count),
+            ]
+        )
+        tracker = MultiObjectTracker(gate_m=1.0, max_missed=5)
+        truth_to_track: dict[int, int] = {}
+        correct_associations = 0
+        total_associations = 0
+        prediction_errors: list[float] = []
+
+        for step in range(steps):
+            detections = _worker_detections(rng, positions)
+            tracker.update(detections, dt)
+            assignments = _assign_tracks_to_truths(tracker, positions, max_distance_m=0.75)
+            if step >= 10:
+                future_positions = positions + velocities * 1.0
+                predictions = {track_id: np.array([x, y]) for track_id, x, y in tracker.predicted_positions(1.0)}
+                for truth_id, track_id in assignments.items():
+                    if truth_id in truth_to_track:
+                        total_associations += 1
+                        correct_associations += int(truth_to_track[truth_id] == track_id)
+                    else:
+                        truth_to_track[truth_id] = track_id
+                    if track_id in predictions:
+                        prediction_errors.append(
+                            float(np.linalg.norm(predictions[track_id] - future_positions[truth_id]))
+                        )
+            positions = _advance_workers(positions, velocities, dt)
+
+        rows.append(
+            TrackingBenchmarkRow(
+                seed=seed,
+                worker_count=worker_count,
+                track_count=len(tracker.tracks),
+                mean_prediction_error_m=_mean(prediction_errors),
+                association_accuracy=(
+                    correct_associations / total_associations if total_associations else 0.0
+                ),
+                wall_time_ms=(perf_counter() - started) * 1000.0,
+            )
+        )
+
+    _write_csv(rows, output)
+    return rows
+
+
 def run_stress_benchmark(
     seeds: Sequence[int] | None = None,
     scenarios: Sequence[StressScenario] | None = None,
@@ -221,6 +297,65 @@ def run_stress_benchmark(
 
 def _point_length(points: Sequence[Point2D | Pose2D]) -> float:
     return sum(hypot(b.x - a.x, b.y - a.y) for a, b in zip(points, points[1:]))
+
+
+def _initial_worker_positions(rng: np.random.Generator, worker_count: int) -> NDArray[np.float64]:
+    x_positions = np.linspace(1.0, 19.0, worker_count)
+    y_positions = np.linspace(2.0, 28.0, worker_count)
+    return np.column_stack([x_positions, y_positions]) + rng.normal(0.0, 0.05, (worker_count, 2))
+
+
+def _worker_detections(
+    rng: np.random.Generator,
+    positions: NDArray[np.float64],
+) -> list[LidarDetection]:
+    detections: list[LidarDetection] = []
+    order = list(range(len(positions)))
+    rng.shuffle(order)
+    for idx in order:
+        noise = rng.normal(0.0, 0.03, 2)
+        detections.append(
+            LidarDetection(
+                x=float(positions[idx, 0] + noise[0]),
+                y=float(positions[idx, 1] + noise[1]),
+                kind="worker",
+            )
+        )
+    return detections
+
+
+def _assign_tracks_to_truths(
+    tracker: MultiObjectTracker,
+    positions: NDArray[np.float64],
+    max_distance_m: float,
+) -> dict[int, int]:
+    assignments: dict[int, int] = {}
+    used_tracks: set[int] = set()
+    for truth_id in range(len(positions)):
+        best: tuple[float, int] | None = None
+        truth_xy = positions[truth_id]
+        for track in tracker.tracks:
+            if track.track_id in used_tracks:
+                continue
+            distance_m = float(np.linalg.norm(track.xy - truth_xy))
+            if distance_m <= max_distance_m and (best is None or distance_m < best[0]):
+                best = (distance_m, track.track_id)
+        if best is not None:
+            assignments[truth_id] = best[1]
+            used_tracks.add(best[1])
+    return assignments
+
+
+def _advance_workers(
+    positions: NDArray[np.float64],
+    velocities: NDArray[np.float64],
+    dt: float,
+) -> NDArray[np.float64]:
+    return positions + velocities * dt
+
+
+def _mean(values: Sequence[float]) -> float:
+    return sum(values) / len(values) if values else 0.0
 
 
 def _write_csv(rows: Sequence[Any], output: Path) -> None:

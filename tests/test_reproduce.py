@@ -3,7 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 import unittest
 
-from terrascout.eval.benchmarks import PlannerBenchmarkRow, SlamBenchmarkRow, StressSummaryRow
+from terrascout.eval.benchmarks import (
+    PlannerBenchmarkRow,
+    SlamBenchmarkRow,
+    StressSummaryRow,
+    TrackingBenchmarkRow,
+)
 from terrascout.runner.mission import MissionMetrics
 from terrascout.runner.reproduce import build_reproduce_summary
 
@@ -43,6 +48,7 @@ class ReproduceSummaryTest(unittest.TestCase):
             artifacts_dir=Path("artifacts"),
             mission=mission,
             mission_rows=[mission],
+            tracking_rows=[TrackingBenchmarkRow(7, 10, 10, 0.04, 1.0, 2.0)],
             planner_rows=[
                 PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 8.0),
                 PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 55.0),
@@ -55,6 +61,7 @@ class ReproduceSummaryTest(unittest.TestCase):
         self.assertEqual(summary["artifacts_dir"], "artifacts")
         self.assertEqual(summary["mission"]["collisions"], 0)
         self.assertEqual(summary["benchmark_summary"]["mission_total_collisions"], 0)
+        self.assertEqual(summary["benchmark_summary"]["tracking_mean_association_accuracy"], 1.0)
         self.assertEqual(
             summary["benchmark_summary"]["planner_mean_wall_time_ms"]["hybrid_astar"],
             55.0,
