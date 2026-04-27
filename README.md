@@ -96,3 +96,5 @@ Runtime flow:
 ## Why This Exists
 
 The goal is to show an end-to-end autonomy slice that is small enough to understand but complete enough to run: a simulated rover, sensors, tracking, planning, control, evaluation, and a reproducible public repo.
+
+For a reviewer-friendly summary, see [docs/PROJECT_ONE_PAGER.md](docs/PROJECT_ONE_PAGER.md).
