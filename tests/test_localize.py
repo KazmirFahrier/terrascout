@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from terrascout.eval.benchmarks import percentile, run_localization_benchmark
 from terrascout.localize.particle import ParticleLocalizer
 from terrascout.sim.geometry import Pose2D, distance
 from terrascout.sim.world import OrchardWorld, ScenarioConfig
@@ -41,6 +42,13 @@ class ParticleLocalizerTest(unittest.TestCase):
         self.assertLess(len(localizer.particles), 900)
         self.assertGreaterEqual(len(localizer.particles), localizer.min_particles)
         self.assertAlmostEqual(float(localizer.weights.sum()), 1.0)
+
+    def test_localization_benchmark_meets_current_l2_metric(self) -> None:
+        rows = run_localization_benchmark(seeds=[2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
+        errors = [row.final_pose_error_m for row in rows]
+
+        self.assertLess(percentile(errors, 95), 0.15)
+        self.assertLessEqual(max(row.particle_count for row in rows), 3000)
 
 
 if __name__ == "__main__":

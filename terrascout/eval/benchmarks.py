@@ -13,11 +13,12 @@ import numpy as np
 from numpy.typing import NDArray
 
 from terrascout.control.pid import DriveController
+from terrascout.localize.particle import ParticleLocalizer
 from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.runner.mission import MissionMetrics, run_mission, write_metrics_csv
-from terrascout.sim.geometry import Point2D, Pose2D, wrap_angle
+from terrascout.sim.geometry import Point2D, Pose2D, distance, wrap_angle
 from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.world import LidarDetection, OrchardWorld, ScenarioConfig
 from terrascout.tracking.kalman import MultiObjectTracker
@@ -58,6 +59,16 @@ class TrackingBenchmarkRow:
     track_count: int
     mean_prediction_error_m: float
     association_accuracy: float
+    wall_time_ms: float
+
+
+@dataclass(frozen=True)
+class LocalizationBenchmarkRow:
+    seed: int
+    prior_position_error_m: float
+    prior_heading_error_deg: float
+    final_pose_error_m: float
+    particle_count: int
     wall_time_ms: float
 
 
@@ -282,6 +293,51 @@ def run_tracking_benchmark(
     return rows
 
 
+def run_localization_benchmark(
+    output: Path = Path("artifacts/localization_benchmark.csv"),
+    seeds: Sequence[int] | None = None,
+) -> list[LocalizationBenchmarkRow]:
+    """Evaluate coarse-prior particle-filter pose refinement."""
+
+    rows: list[LocalizationBenchmarkRow] = []
+    for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
+        started = perf_counter()
+        rng = np.random.default_rng(seed)
+        world = OrchardWorld(ScenarioConfig(rows=4, trees_per_row=6, worker_count=0, random_seed=seed))
+        truth = Pose2D(
+            x=float(rng.uniform(3.0, 8.0)),
+            y=float(rng.uniform(3.0, 10.0)),
+            theta=float(rng.uniform(-1.0, 1.0)),
+        )
+        dx = float(rng.uniform(-0.5, 0.5))
+        dy = float(rng.uniform(-0.5, 0.5))
+        dtheta = float(rng.uniform(-pi / 18.0, pi / 18.0))
+        prior = Pose2D(truth.x + dx, truth.y + dy, wrap_angle(truth.theta + dtheta))
+        localizer = ParticleLocalizer.gaussian(
+            1500,
+            mean=prior,
+            std=(0.8, 0.8, pi / 9.0),
+            seed=seed + 100,
+        )
+        for _ in range(5):
+            detections = world.local_lidar_detections(truth, include_workers=False)
+            localizer.update(detections, world.trees)
+
+        rows.append(
+            LocalizationBenchmarkRow(
+                seed=seed,
+                prior_position_error_m=distance(prior, truth),
+                prior_heading_error_deg=abs(wrap_angle(prior.theta - truth.theta)) * 180.0 / pi,
+                final_pose_error_m=distance(localizer.estimate(), truth),
+                particle_count=len(localizer.particles),
+                wall_time_ms=(perf_counter() - started) * 1000.0,
+            )
+        )
+
+    _write_csv(rows, output)
+    return rows
+
+
 def run_stress_benchmark(
     seeds: Sequence[int] | None = None,
     scenarios: Sequence[StressScenario] | None = None,
@@ -435,6 +491,14 @@ def _advance_workers(
 
 def _mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def percentile(values: Sequence[float], percentile_value: float) -> float:
+    """Return a percentile for summary metrics."""
+
+    if not values:
+        return 0.0
+    return float(np.percentile(np.array(values, dtype=float), percentile_value))
 
 
 def _write_csv(rows: Sequence[Any], output: Path) -> None:

@@ -5,6 +5,7 @@ import unittest
 
 from terrascout.eval.benchmarks import (
     ControlBenchmarkRow,
+    LocalizationBenchmarkRow,
     PlannerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
@@ -51,6 +52,7 @@ class ReproduceSummaryTest(unittest.TestCase):
             mission_rows=[mission],
             control_rows=[ControlBenchmarkRow(7, 0.02, 0.02, 1.0, 0.04, 1.0)],
             tracking_rows=[TrackingBenchmarkRow(7, 10, 10, 0.04, 1.0, 2.0)],
+            localization_rows=[LocalizationBenchmarkRow(7, 0.5, 5.0, 0.12, 1350, 4.0)],
             planner_rows=[
                 PlannerBenchmarkRow(7, "grid_astar", 12, 18.5, 8.0),
                 PlannerBenchmarkRow(7, "hybrid_astar", 8, 19.0, 55.0),
@@ -65,6 +67,7 @@ class ReproduceSummaryTest(unittest.TestCase):
         self.assertEqual(summary["benchmark_summary"]["mission_total_collisions"], 0)
         self.assertEqual(summary["benchmark_summary"]["control_max_cross_track_error_m"], 0.02)
         self.assertEqual(summary["benchmark_summary"]["tracking_mean_association_accuracy"], 1.0)
+        self.assertEqual(summary["benchmark_summary"]["localization_p95_pose_error_m"], 0.12)
         self.assertEqual(
             summary["benchmark_summary"]["planner_mean_wall_time_ms"]["hybrid_astar"],
             55.0,
