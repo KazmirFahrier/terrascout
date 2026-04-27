@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import atan2, cos, hypot, radians, sin
+from math import atan2, cos, hypot, radians, sin, sqrt
 
 import numpy as np
 from numpy.typing import NDArray
 
 from terrascout.sim.geometry import Point2D, Pose2D, distance
+from terrascout.sim.rover import DifferentialDriveRover
+from terrascout.sim.sensors import EncoderSample, ImuSample, LidarScan, SensorConfig, SensorFrame
 
 
 @dataclass(frozen=True)
@@ -173,6 +175,79 @@ class OrchardWorld:
                     detections.append(self._local_detection(pose, worker.position, "worker"))
         return detections
 
+    def lidar_scan(
+        self,
+        pose: Pose2D,
+        sensor_config: SensorConfig | None = None,
+    ) -> LidarScan:
+        """Return a 270-degree lidar scan with 0.5-degree default angular resolution."""
+
+        sensor_config = sensor_config or SensorConfig()
+        beam_count = int(sensor_config.lidar_fov_deg / sensor_config.lidar_angular_resolution_deg) + 1
+        start_angle = -radians(sensor_config.lidar_fov_deg) / 2.0
+        step = radians(sensor_config.lidar_angular_resolution_deg)
+        angles = [start_angle + idx * step for idx in range(beam_count)]
+        obstacles = [(tree, 0.18) for tree in self.trees]
+        obstacles.extend((worker.position, worker.radius_m) for worker in self.workers)
+        ranges = [
+            self._beam_range(
+                pose=pose,
+                relative_angle=angle,
+                obstacles=obstacles,
+                max_range_m=self.config.lidar_range_m,
+                noise_sigma_m=sensor_config.lidar_range_noise_m,
+            )
+            for angle in angles
+        ]
+        return LidarScan(angles_rad=angles, ranges_m=ranges, max_range_m=self.config.lidar_range_m)
+
+    def imu_sample(
+        self,
+        rover: DifferentialDriveRover,
+        sensor_config: SensorConfig | None = None,
+    ) -> ImuSample:
+        """Return a noisy planar IMU yaw-rate and forward-acceleration sample."""
+
+        sensor_config = sensor_config or SensorConfig()
+        yaw_rate = (rover.right_velocity_mps - rover.left_velocity_mps) / rover.wheel_base_m
+        linear_speed = 0.5 * (rover.left_velocity_mps + rover.right_velocity_mps)
+        yaw_rate += sensor_config.gyro_bias_rps
+        yaw_rate += float(self.rng.normal(0.0, sensor_config.gyro_noise_rps))
+        longitudinal_accel = float(self.rng.normal(0.0, sensor_config.accel_noise_mps2))
+        longitudinal_accel += linear_speed * rover.slip_fraction * 0.05
+        return ImuSample(yaw_rate_rps=yaw_rate, longitudinal_accel_mps2=longitudinal_accel)
+
+    def encoder_sample(
+        self,
+        rover: DifferentialDriveRover,
+        dt: float,
+        sensor_config: SensorConfig | None = None,
+    ) -> EncoderSample:
+        """Return noisy wheel-encoder distance increments."""
+
+        sensor_config = sensor_config or SensorConfig()
+        left_noise = 1.0 + float(self.rng.normal(0.0, sensor_config.encoder_noise_fraction))
+        right_noise = 1.0 + float(self.rng.normal(0.0, sensor_config.encoder_noise_fraction))
+        return EncoderSample(
+            left_delta_m=rover.left_velocity_mps * dt * left_noise,
+            right_delta_m=rover.right_velocity_mps * dt * right_noise,
+        )
+
+    def sensor_frame(
+        self,
+        rover: DifferentialDriveRover,
+        dt: float,
+        sensor_config: SensorConfig | None = None,
+    ) -> SensorFrame:
+        """Return synchronized lidar, IMU, and encoder samples for one 20 Hz tick."""
+
+        sensor_config = sensor_config or SensorConfig()
+        return SensorFrame(
+            lidar=self.lidar_scan(rover.pose, sensor_config),
+            imu=self.imu_sample(rover, sensor_config),
+            encoders=self.encoder_sample(rover, dt, sensor_config),
+        )
+
     def _visible(self, pose: Pose2D, point: Point2D) -> bool:
         dx = point.x - pose.x
         dy = point.y - pose.y
@@ -196,6 +271,35 @@ class OrchardWorld:
             bearing_rad=atan2(dy, dx) - pose.theta + bearing_noise,
             kind=kind,
         )
+
+    def _beam_range(
+        self,
+        pose: Pose2D,
+        relative_angle: float,
+        obstacles: list[tuple[Point2D, float]],
+        max_range_m: float,
+        noise_sigma_m: float,
+    ) -> float:
+        heading = pose.theta + relative_angle
+        direction_x = cos(heading)
+        direction_y = sin(heading)
+        best = max_range_m
+        for center, radius in obstacles:
+            dx = center.x - pose.x
+            dy = center.y - pose.y
+            projection = dx * direction_x + dy * direction_y
+            if projection <= 0.0 or projection - radius > best:
+                continue
+            lateral_sq = dx * dx + dy * dy - projection * projection
+            radius_sq = radius * radius
+            if lateral_sq > radius_sq:
+                continue
+            hit = projection - sqrt(max(0.0, radius_sq - lateral_sq))
+            if 0.0 <= hit < best:
+                best = hit
+        if best < max_range_m:
+            best += float(self.rng.normal(0.0, noise_sigma_m))
+        return min(max(best, 0.0), max_range_m)
 
     def collision_with_worker(self, pose: Pose2D, rover_radius_m: float = 0.45) -> bool:
         """Return true when the rover body intersects a worker."""

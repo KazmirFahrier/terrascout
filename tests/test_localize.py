@@ -22,8 +22,26 @@ class ParticleLocalizerTest(unittest.TestCase):
             localizer.update(world.local_lidar_detections(truth, include_workers=False), world.trees)
 
         self.assertLess(distance(localizer.estimate(), truth), 0.25)
+        self.assertLessEqual(len(localizer.particles), 1500)
+        self.assertGreaterEqual(len(localizer.particles), localizer.min_particles)
+
+    def test_kld_resampling_adapts_particle_count(self) -> None:
+        localizer = ParticleLocalizer.gaussian(
+            900,
+            mean=Pose2D(1.0, 2.0, 0.2),
+            std=(0.1, 0.1, 0.04),
+            seed=12,
+        )
+        localizer.weights[:] = 1e-6
+        localizer.weights[:5] = 1.0
+        localizer.weights /= localizer.weights.sum()
+
+        localizer.resample()
+
+        self.assertLess(len(localizer.particles), 900)
+        self.assertGreaterEqual(len(localizer.particles), localizer.min_particles)
+        self.assertAlmostEqual(float(localizer.weights.sum()), 1.0)
 
 
 if __name__ == "__main__":
     unittest.main()
-

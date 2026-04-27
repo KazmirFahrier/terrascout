@@ -9,9 +9,10 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Procedural orchard generation with tree landmarks and moving field workers.
 - Differential-drive rover dynamics with wheel-speed saturation and slip.
 - Twin-loop PID waypoint tracking.
-- Lidar-style noisy cluster detections for trees and workers.
+- Lidar-style noisy cluster detections plus 270-degree / 0.5-degree scan frames.
+- IMU yaw-rate and wheel-encoder tick samples for the simulator sensor frame.
 - Constant-velocity Kalman tracking for moving worker detections.
-- Particle-filter localization against orchard tree landmarks from a coarse pose prior.
+- KLD-adaptive particle-filter localization against orchard tree landmarks from a coarse pose prior.
 - Online Gaussian tree-landmark mapping from local range/bearing detections.
 - Compact EKF-SLAM back end with state expansion, covariance propagation, and range/bearing updates.
 - Grid A* path planning over inflated tree and worker obstacles.
@@ -23,7 +24,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Static PNG and animated GIF rendering for mission traces.
 - Benchmark CSV generation, unit tests, and GitHub Actions CI.
 
-This is intentionally **TerraScout MVP**, not a finished research-grade autonomy stack. The default mission uses ground-truth pose for the most stable demo path, but estimated-pose control is available with `--pose-source particle` or `--pose-source slam`. Hybrid A* is available with `--planner hybrid`.
+This is a simulation-first autonomy stack, not a finished field robot. The default mission uses ground-truth pose for the most stable demo path, but estimated-pose control is available with `--pose-source particle` or `--pose-source slam`. Hybrid A* is available with `--planner hybrid`.
 
 ## Quick Start
 
@@ -60,7 +61,7 @@ python -m unittest discover -s tests
 
 ## Current Benchmark
 
-Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
+Run on a local laptop with the default configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
 
 | Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Final SOC | Mean wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -94,9 +95,9 @@ terrascout/
 
 Runtime flow:
 
-1. The world emits noisy lidar-style detections.
+1. The world emits noisy lidar-style detections plus synchronized lidar scan, IMU, and encoder frames.
 2. The Kalman tracker updates worker tracks and predicts near-future positions.
-3. The particle filter estimates rover pose from local tree observations.
+3. The KLD-adaptive particle filter estimates rover pose from local tree observations.
 4. The landmark mapper accumulates a tree map from range/bearing detections.
 5. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
 6. The planner builds an inflated occupancy grid from trees and predicted workers.

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import atan2, pi
+from math import atan2, ceil, pi, sqrt
 
 import numpy as np
 from numpy.typing import NDArray
@@ -19,6 +19,11 @@ class ParticleLocalizer:
     particles: NDArray[np.float64]
     weights: NDArray[np.float64]
     rng: np.random.Generator
+    min_particles: int = 150
+    max_particles: int = 3000
+    kld_epsilon: float = 0.05
+    kld_z: float = 2.33
+    bin_size: tuple[float, float, float] = (0.35, 0.35, 0.18)
 
     @classmethod
     def uniform(
@@ -36,7 +41,13 @@ class ParticleLocalizer:
                 rng.uniform(-pi, pi, count),
             ]
         )
-        return cls(particles=particles, weights=np.full(count, 1.0 / count), rng=rng)
+        return cls(
+            particles=particles,
+            weights=np.full(count, 1.0 / count),
+            rng=rng,
+            min_particles=count if count <= 500 else max(100, min(count, int(0.9 * count))),
+            max_particles=count,
+        )
 
     @classmethod
     def gaussian(
@@ -57,7 +68,13 @@ class ParticleLocalizer:
             ]
         )
         particles[:, 2] = np.array([wrap_angle(float(theta)) for theta in particles[:, 2]])
-        return cls(particles=particles, weights=np.full(count, 1.0 / count), rng=rng)
+        return cls(
+            particles=particles,
+            weights=np.full(count, 1.0 / count),
+            rng=rng,
+            min_particles=count if count <= 500 else max(100, min(count, int(0.9 * count))),
+            max_particles=count,
+        )
 
     def predict(self, linear_mps: float, angular_rps: float, dt: float) -> None:
         """Propagate particles with a noisy differential-drive motion model."""
@@ -104,19 +121,45 @@ class ParticleLocalizer:
         return float(1.0 / np.sum(self.weights**2))
 
     def resample(self) -> None:
-        """Low-variance systematic resampling."""
+        """KLD-adaptive low-variance resampling with a small particle-injection tail."""
 
-        n = len(self.particles)
+        occupied_bins = {
+            self._particle_bin(particle)
+            for particle, weight in zip(self.particles, self.weights)
+            if weight > 0.5 / len(self.particles)
+        }
+        target_count = self._kld_required_sample_count(len(occupied_bins))
+        n = min(self.max_particles, max(self.min_particles, target_count))
         positions = (self.rng.random() + np.arange(n)) / n
         cumulative = np.cumsum(self.weights)
         indices = np.searchsorted(cumulative, positions, side="left")
+        indices = np.minimum(indices, len(self.particles) - 1)
         self.particles = self.particles[indices].copy()
+        n = len(self.particles)
         self.weights = np.full(n, 1.0 / n)
-        keep = int(0.97 * n)
-        if keep < n:
-            self.particles[keep:, 0] += self.rng.normal(0.0, 0.25, n - keep)
-            self.particles[keep:, 1] += self.rng.normal(0.0, 0.25, n - keep)
-            self.particles[keep:, 2] += self.rng.normal(0.0, 0.08, n - keep)
+        inject = max(1, int(0.03 * n))
+        if inject < n:
+            self.particles[-inject:, 0] += self.rng.normal(0.0, 0.25, inject)
+            self.particles[-inject:, 1] += self.rng.normal(0.0, 0.25, inject)
+            self.particles[-inject:, 2] += self.rng.normal(0.0, 0.08, inject)
+            self.particles[-inject:, 2] = np.array(
+                [wrap_angle(float(theta)) for theta in self.particles[-inject:, 2]]
+            )
+
+    def _particle_bin(self, particle: NDArray[np.float64]) -> tuple[int, int, int]:
+        return (
+            int(particle[0] / self.bin_size[0]),
+            int(particle[1] / self.bin_size[1]),
+            int(wrap_angle(float(particle[2])) / self.bin_size[2]),
+        )
+
+    def _kld_required_sample_count(self, occupied_bins: int) -> int:
+        if occupied_bins <= 1:
+            return self.min_particles
+        bin_term = 1.0 - 2.0 / (9.0 * (occupied_bins - 1))
+        confidence_term = self.kld_z * sqrt(2.0 / (9.0 * (occupied_bins - 1)))
+        required = (occupied_bins - 1) / (2.0 * self.kld_epsilon) * (bin_term + confidence_term) ** 3
+        return max(self.min_particles, min(self.max_particles, int(ceil(required))))
 
     def estimate(self) -> Pose2D:
         """Return the weighted mean pose."""

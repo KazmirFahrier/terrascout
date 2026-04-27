@@ -10,12 +10,13 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 | --- | --- | --- |
 | L0 Control | PID | Twin-loop waypoint tracking for differential-drive wheel commands |
 | L1 Tracking | Kalman filter | Constant-velocity worker tracker from noisy lidar cluster detections |
-| L2 Localization | Particle filter | Coarse-prior Monte-Carlo localization against orchard tree landmarks |
+| L2 Localization | KLD-adaptive particle filter | Coarse-prior Monte-Carlo localization against orchard tree landmarks |
 | L3 Mapping | EKF-SLAM | Compact state/covariance SLAM with range/bearing landmark updates |
 | L4 Planning | Grid A* + Hybrid A* | Fast grid routing plus heading-aware Hybrid A* arc primitives |
 | L5 Scheduling | Resource-aware value search | Row scheduling under priority, travel cost, battery, and daylight budgets |
 | L6 Battery | Energy accounting | State-of-charge drain and recharge-station contact metrics |
 | L7 Safety | Command supervision | Wheel-command scaling near perceived or predicted workers |
+| Sensors | Lidar + IMU + encoders | 270-degree / 0.5-degree lidar scans, yaw-rate samples, and wheel-encoder ticks |
 
 ## Current Metrics
 
@@ -58,7 +59,7 @@ python -m pytest
 
 ## Roadmap
 
-- Stress-test particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
+- Stress-test KLD-adaptive particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
 - Add battery discharge and recharge stations to the mission simulator.
 - Add coverage badges, richer demo GIFs, and a short narrated demo video.
