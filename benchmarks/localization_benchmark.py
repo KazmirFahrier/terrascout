@@ -18,6 +18,8 @@ def main() -> None:
     rows = run()
     errors = [row.final_pose_error_m for row in rows]
     print(
+        f"max_prior_m={max(row.prior_position_error_m for row in rows):.2f} "
+        f"max_prior_deg={max(row.prior_heading_error_deg for row in rows):.1f} "
         f"mean_error_m={sum(errors) / len(errors):.3f} "
         f"p95_error_m={percentile(errors, 95):.3f} "
         f"max_particles={max(row.particle_count for row in rows)}"

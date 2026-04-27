@@ -357,7 +357,7 @@ def run_localization_benchmark(
     output: Path = Path("artifacts/localization_benchmark.csv"),
     seeds: Sequence[int] | None = None,
 ) -> list[LocalizationBenchmarkRow]:
-    """Evaluate coarse-prior particle-filter pose refinement."""
+    """Evaluate particle-filter relocalization from a +/-5 m, +/-30 degree prior."""
 
     rows: list[LocalizationBenchmarkRow] = []
     for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
@@ -369,18 +369,21 @@ def run_localization_benchmark(
             y=float(rng.uniform(3.0, 10.0)),
             theta=float(rng.uniform(-1.0, 1.0)),
         )
-        dx = float(rng.uniform(-0.5, 0.5))
-        dy = float(rng.uniform(-0.5, 0.5))
-        dtheta = float(rng.uniform(-pi / 18.0, pi / 18.0))
+        prior_radius = float(rng.uniform(3.5, 5.0))
+        prior_angle = float(rng.uniform(-pi, pi))
+        dx = prior_radius * cos(prior_angle)
+        dy = prior_radius * sin(prior_angle)
+        dtheta = float(rng.uniform(-pi / 6.0, pi / 6.0))
         prior = Pose2D(truth.x + dx, truth.y + dy, wrap_angle(truth.theta + dtheta))
         localizer = ParticleLocalizer.gaussian(
-            1500,
+            3000,
             mean=prior,
-            std=(0.8, 0.8, pi / 9.0),
+            std=(2.2, 2.2, pi / 5.0),
             seed=seed + 100,
         )
+        detections = world.local_lidar_detections(truth, include_workers=False)
+        localizer.scan_match_reset(detections, world.trees)
         for _ in range(5):
-            detections = world.local_lidar_detections(truth, include_workers=False)
             localizer.update(detections, world.trees)
 
         rows.append(

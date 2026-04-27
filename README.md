@@ -12,7 +12,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Lidar-style noisy cluster detections plus 270-degree / 0.5-degree scan frames.
 - IMU yaw-rate and wheel-encoder tick samples for the simulator sensor frame.
 - Constant-velocity Kalman tracking for moving worker detections.
-- KLD-adaptive particle-filter localization against orchard tree landmarks from a coarse pose prior.
+- KLD-adaptive particle-filter localization with coarse-to-fine lidar scan matching from a +/-5 m, +/-30 degree pose prior.
 - Online Gaussian tree-landmark mapping from local range/bearing detections.
 - Compact EKF-SLAM back end with state expansion, covariance propagation, and range/bearing updates.
 - Grid A* path planning over inflated tree and worker obstacles.
@@ -80,7 +80,7 @@ L0 control benchmark output is written to `artifacts/control_benchmark.csv`. It 
 
 L1 tracking benchmark output is written to `artifacts/tracking_benchmark.csv`. The benchmark evaluates 10 simultaneous moving workers over deterministic seeded scenes and reports 1-second prediction error plus ID-continuity association accuracy.
 
-L2 localization benchmark output is written to `artifacts/localization_benchmark.csv`. It evaluates particle-filter refinement from a coarse local pose prior and reports mean/p95 final pose error plus particle count.
+L2 localization benchmark output is written to `artifacts/localization_benchmark.csv`. It evaluates particle-filter relocalization from a +/-5 m, +/-30 degree pose prior and reports prior error, mean/p95 final pose error, and particle count.
 
 L5 scheduler benchmark output is written to `artifacts/scheduler_benchmark.csv`. It compares the MDP value-iteration route with a brute-force permutation oracle and reports optimality gap, iterations, and wall time.
 

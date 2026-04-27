@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import atan2, ceil, pi, sqrt
+from math import atan2, ceil, hypot, pi, sqrt
 
 import numpy as np
 from numpy.typing import NDArray
@@ -117,6 +117,63 @@ class ParticleLocalizer:
         if self.effective_sample_size < 0.55 * len(self.particles):
             self.resample()
 
+    def scan_match_reset(
+        self,
+        detections: list[LocalLidarDetection],
+        landmarks: list[Point2D],
+        max_detections: int = 18,
+    ) -> Pose2D:
+        """Coarse-to-fine lidar scan matching around the current pose prior."""
+
+        tree_observations = [det for det in detections if det.kind == "tree"][:max_detections]
+        if not tree_observations or not landmarks:
+            return self.estimate()
+
+        landmark_xy = np.array([(landmark.x, landmark.y) for landmark in landmarks], dtype=float)
+        center = self.estimate()
+        candidates = self._scan_match_candidates(
+            center,
+            tree_observations,
+            landmark_xy,
+            xy_step_m=0.5,
+            theta_step_rad=pi / 36.0,
+            xy_span_m=5.5,
+            theta_span_rad=pi / 5.0,
+            keep=12,
+            separation_m=0.75,
+            separation_theta_rad=0.12,
+        )
+        for xy_step, theta_step, xy_span, theta_span, keep in (
+            (0.16, pi / 90.0, 0.8, pi / 18.0, 8),
+            (0.05, pi / 180.0, 0.2, pi / 90.0, 1),
+        ):
+            refined: list[tuple[float, Pose2D]] = []
+            for _, candidate in candidates:
+                refined.extend(
+                    self._scan_match_candidates(
+                        candidate,
+                        tree_observations,
+                        landmark_xy,
+                        xy_step_m=xy_step,
+                        theta_step_rad=theta_step,
+                        xy_span_m=xy_span,
+                        theta_span_rad=theta_span,
+                        keep=2,
+                        separation_m=0.25,
+                        separation_theta_rad=0.04,
+                    )
+                )
+            candidates = self._select_scan_match_candidates(
+                sorted(refined, key=lambda item: item[0]),
+                keep=keep,
+                separation_m=0.35,
+                separation_theta_rad=0.05,
+            )
+
+        best_pose = candidates[0][1]
+        self._reset_gaussian(best_pose, std=(0.18, 0.18, 0.06))
+        return best_pose
+
     @property
     def effective_sample_size(self) -> float:
         return float(1.0 / np.sum(self.weights**2))
@@ -196,3 +253,86 @@ class ParticleLocalizer:
         mask = np.sum(deltas**2, axis=1) <= radius_m * radius_m
         candidates = landmark_xy[mask]
         return candidates if len(candidates) >= 4 else landmark_xy
+
+    def _scan_match_candidates(
+        self,
+        center: Pose2D,
+        observations: list[LocalLidarDetection],
+        landmark_xy: NDArray[np.float64],
+        xy_step_m: float,
+        theta_step_rad: float,
+        xy_span_m: float,
+        theta_span_rad: float,
+        keep: int,
+        separation_m: float,
+        separation_theta_rad: float,
+    ) -> list[tuple[float, Pose2D]]:
+        scored: list[tuple[float, Pose2D]] = []
+        for x in np.arange(center.x - xy_span_m, center.x + xy_span_m + 1e-9, xy_step_m):
+            for y in np.arange(center.y - xy_span_m, center.y + xy_span_m + 1e-9, xy_step_m):
+                for theta in np.arange(
+                    center.theta - theta_span_rad,
+                    center.theta + theta_span_rad + 1e-9,
+                    theta_step_rad,
+                ):
+                    pose = Pose2D(float(x), float(y), wrap_angle(float(theta)))
+                    scored.append((self._scan_match_score(pose, observations, landmark_xy), pose))
+        return self._select_scan_match_candidates(
+            sorted(scored, key=lambda item: item[0]),
+            keep=keep,
+            separation_m=separation_m,
+            separation_theta_rad=separation_theta_rad,
+        )
+
+    def _select_scan_match_candidates(
+        self,
+        scored: list[tuple[float, Pose2D]],
+        keep: int,
+        separation_m: float,
+        separation_theta_rad: float,
+    ) -> list[tuple[float, Pose2D]]:
+        selected: list[tuple[float, Pose2D]] = []
+        for score, pose in scored:
+            if all(
+                hypot(pose.x - other.x, pose.y - other.y) > separation_m
+                or abs(wrap_angle(pose.theta - other.theta)) > separation_theta_rad
+                for _, other in selected
+            ):
+                selected.append((score, pose))
+                if len(selected) >= keep:
+                    break
+        return selected or scored[:1]
+
+    def _scan_match_score(
+        self,
+        pose: Pose2D,
+        observations: list[LocalLidarDetection],
+        landmark_xy: NDArray[np.float64],
+    ) -> float:
+        total = 0.0
+        matched_indices: list[int] = []
+        for obs in observations:
+            observed_xy = np.array(
+                [
+                    pose.x + obs.range_m * np.cos(pose.theta + obs.bearing_rad),
+                    pose.y + obs.range_m * np.sin(pose.theta + obs.bearing_rad),
+                ]
+            )
+            distances_sq = np.sum((landmark_xy - observed_xy) ** 2, axis=1)
+            best_index = int(np.argmin(distances_sq))
+            total += min(float(distances_sq[best_index]), 4.0)
+            matched_indices.append(best_index)
+        duplicate_matches = len(matched_indices) - len(set(matched_indices))
+        return total + 0.05 * duplicate_matches
+
+    def _reset_gaussian(self, mean: Pose2D, std: tuple[float, float, float]) -> None:
+        count = len(self.particles)
+        self.particles = np.column_stack(
+            [
+                self.rng.normal(mean.x, std[0], count),
+                self.rng.normal(mean.y, std[1], count),
+                self.rng.normal(mean.theta, std[2], count),
+            ]
+        )
+        self.particles[:, 2] = np.array([wrap_angle(float(theta)) for theta in self.particles[:, 2]])
+        self.weights = np.full(count, 1.0 / count)

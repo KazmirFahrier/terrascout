@@ -74,6 +74,8 @@ class ReproduceSummaryTest(unittest.TestCase):
         self.assertEqual(summary["benchmark_summary"]["control_max_cross_track_error_m"], 0.02)
         self.assertEqual(summary["benchmark_summary"]["tracking_mean_association_accuracy"], 1.0)
         self.assertEqual(summary["benchmark_summary"]["localization_p95_pose_error_m"], 0.12)
+        self.assertEqual(summary["benchmark_summary"]["localization_max_prior_position_error_m"], 0.5)
+        self.assertEqual(summary["benchmark_summary"]["localization_max_prior_heading_error_deg"], 5.0)
         self.assertEqual(summary["benchmark_summary"]["scheduler_max_optimality_gap_percent"], 0.0)
         self.assertEqual(
             summary["benchmark_summary"]["planner_mean_wall_time_ms"]["hybrid_astar"],

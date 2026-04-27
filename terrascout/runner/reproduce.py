@@ -137,6 +137,14 @@ def build_reproduce_summary(
                 [row.final_pose_error_m for row in localization_rows],
                 95,
             ),
+            "localization_max_prior_position_error_m": max(
+                (row.prior_position_error_m for row in localization_rows),
+                default=0.0,
+            ),
+            "localization_max_prior_heading_error_deg": max(
+                (row.prior_heading_error_deg for row in localization_rows),
+                default=0.0,
+            ),
             "scheduler_max_optimality_gap_percent": max(
                 (row.optimality_gap_percent for row in scheduler_rows),
                 default=0.0,

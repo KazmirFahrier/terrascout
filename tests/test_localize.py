@@ -26,6 +26,20 @@ class ParticleLocalizerTest(unittest.TestCase):
         self.assertLessEqual(len(localizer.particles), 1500)
         self.assertGreaterEqual(len(localizer.particles), localizer.min_particles)
 
+    def test_scan_match_reset_recovers_from_wide_pose_prior(self) -> None:
+        world = OrchardWorld(ScenarioConfig(rows=4, trees_per_row=6, worker_count=0, random_seed=7))
+        truth = Pose2D(6.13, 9.28, 0.55)
+        localizer = ParticleLocalizer.gaussian(
+            3000,
+            mean=Pose2D(9.45, 7.35, 0.94),
+            std=(2.2, 2.2, 0.63),
+            seed=107,
+        )
+
+        localizer.scan_match_reset(world.local_lidar_detections(truth, include_workers=False), world.trees)
+
+        self.assertLess(distance(localizer.estimate(), truth), 0.20)
+
     def test_kld_resampling_adapts_particle_count(self) -> None:
         localizer = ParticleLocalizer.gaussian(
             900,
@@ -43,10 +57,12 @@ class ParticleLocalizerTest(unittest.TestCase):
         self.assertGreaterEqual(len(localizer.particles), localizer.min_particles)
         self.assertAlmostEqual(float(localizer.weights.sum()), 1.0)
 
-    def test_localization_benchmark_meets_current_l2_metric(self) -> None:
+    def test_localization_benchmark_meets_l2_acceptance_metric(self) -> None:
         rows = run_localization_benchmark(seeds=[2, 3, 5, 7, 11, 13, 17, 19, 23, 29])
         errors = [row.final_pose_error_m for row in rows]
 
+        self.assertGreater(min(row.prior_position_error_m for row in rows), 3.0)
+        self.assertLessEqual(max(row.prior_heading_error_deg for row in rows), 30.0)
         self.assertLess(percentile(errors, 95), 0.15)
         self.assertLessEqual(max(row.particle_count for row in rows), 3000)
 
