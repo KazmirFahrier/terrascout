@@ -18,6 +18,7 @@ from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.safety.collision_guard import SafetySupervisor
 from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D, distance
+from terrascout.sim.battery import BatteryModel
 from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.world import OrchardWorld, ScenarioConfig
 from terrascout.tracking.kalman import MultiObjectTracker
@@ -46,6 +47,9 @@ class MissionMetrics:
     scheduler_dropped_goals: int
     battery_remaining_m: float
     daylight_remaining_s: float
+    battery_soc_final: float
+    battery_soc_min: float
+    recharge_events: int
     safety_interventions: int
     safety_stops: int
     min_worker_clearance_m: float
@@ -84,6 +88,7 @@ def run_mission(
         )
     )
     rover = DifferentialDriveRover(pose=Pose2D(x=1.0, y=0.8, theta=1.25), slip_fraction=0.04)
+    battery = BatteryModel()
     controller = DriveController.default()
     tracker = MultiObjectTracker()
     mapper = LandmarkMapper()
@@ -125,6 +130,9 @@ def run_mission(
     safety_interventions = 0
     safety_stops = 0
     min_worker_clearance_m = float("inf")
+    battery_soc_min = battery.soc_fraction
+    recharge_events = 0
+    was_recharging = False
 
     trace = MissionTrace(poses=[], goals=[(goal.x, goal.y) for goal in goals], workers=[])
 
@@ -192,7 +200,15 @@ def run_mission(
         pose = rover.step(dt)
         world.step_workers(dt)
 
-        path_length_m += distance(previous_pose, pose)
+        step_distance_m = distance(previous_pose, pose)
+        path_length_m += step_distance_m
+        battery.consume(step_distance_m, dt)
+        is_recharging = any(distance(pose, station) <= 0.75 for station in world.recharge_stations)
+        if is_recharging:
+            battery.recharge(dt)
+            recharge_events += int(not was_recharging)
+        was_recharging = is_recharging
+        battery_soc_min = min(battery_soc_min, battery.soc_fraction)
         previous_pose = pose
 
         if world.collision_with_worker(pose):
@@ -233,6 +249,9 @@ def run_mission(
         scheduler_dropped_goals=schedule.dropped_goals,
         battery_remaining_m=schedule.battery_remaining_m,
         daylight_remaining_s=schedule.time_remaining_s,
+        battery_soc_final=battery.soc_fraction,
+        battery_soc_min=battery_soc_min,
+        recharge_events=recharge_events,
         safety_interventions=safety_interventions,
         safety_stops=safety_stops,
         min_worker_clearance_m=min_worker_clearance_m,

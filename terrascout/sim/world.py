@@ -60,6 +60,7 @@ class OrchardWorld:
         self.rng = np.random.default_rng(config.random_seed)
         self.trees = self._make_trees()
         self.row_goals = self._make_row_goals()
+        self.recharge_stations = self._make_recharge_stations()
         self.workers = self._make_workers()
         self.width_m = (config.rows - 1) * config.row_spacing_m + 2.0 * config.width_margin_m
         self.height_m = (config.trees_per_row - 1) * config.tree_spacing_m + 2.0
@@ -85,6 +86,9 @@ class OrchardWorld:
             )
             for lane in range(lane_count)
         ]
+
+    def _make_recharge_stations(self) -> list[Point2D]:
+        return [Point2D(1.0, 0.8)]
 
     @property
     def height_y(self) -> float:

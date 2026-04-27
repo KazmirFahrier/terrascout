@@ -14,7 +14,8 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 | L3 Mapping | EKF-SLAM | Compact state/covariance SLAM with range/bearing landmark updates |
 | L4 Planning | Grid A* + Hybrid A* | Fast grid routing plus heading-aware Hybrid A* arc primitives |
 | L5 Scheduling | Resource-aware value search | Row scheduling under priority, travel cost, battery, and daylight budgets |
-| L6 Safety | Command supervision | Wheel-command scaling near perceived or predicted workers |
+| L6 Battery | Energy accounting | State-of-charge drain and recharge-station contact metrics |
+| L7 Safety | Command supervision | Wheel-command scaling near perceived or predicted workers |
 
 ## Current Metrics
 
@@ -27,6 +28,7 @@ Default benchmark seeds: `2, 3, 5, 7, 11`.
 | Mean localization error | ~0.19 m |
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |
+| Final battery SOC | ~90% |
 | Mean mission wall time | ~3.0 s |
 | Runtime safety layer | Reports interventions, stops, and minimum perceived worker clearance |
 

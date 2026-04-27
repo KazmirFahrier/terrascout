@@ -17,6 +17,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Grid A* path planning over inflated tree and worker obstacles.
 - Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives.
 - Resource-aware inspection scheduler over row priority, travel cost, battery, and daylight budgets.
+- Battery state-of-charge model with recharge-station contact telemetry.
 - Runtime safety supervisor that scales wheel commands near perceived or predicted workers.
 - End-to-end row-inspection mission runner with deterministic metrics.
 - Static PNG and animated GIF rendering for mission traces.
@@ -52,9 +53,9 @@ python -m unittest discover -s tests
 
 Run on a local laptop with the default MVP configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
 
-| Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Scheduler drops | Mean wall time |
+| Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Final SOC | Mean wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | 0 | ~3.2 s |
+| 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | ~90% | ~3.2 s |
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -88,8 +89,9 @@ Runtime flow:
 5. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
 6. The planner builds an inflated occupancy grid from trees and predicted workers.
 7. The PID controller proposes wheel commands from truth, particle-filter, or EKF-SLAM pose.
-8. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
-9. The mission runner records inspection, collision, safety, mapping, EKF-SLAM, localization, path-length, and timing metrics.
+8. The battery model consumes energy from motion/idle time and records recharge-station contact.
+9. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
+10. The mission runner records inspection, collision, safety, battery, mapping, EKF-SLAM, localization, path-length, and timing metrics.
 
 ## Roadmap
 
