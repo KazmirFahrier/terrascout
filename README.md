@@ -56,6 +56,7 @@ python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
 python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
+python docs/design/render_design_pdfs.py
 python -m pytest
 ```
 
@@ -123,11 +124,15 @@ Runtime flow:
 9. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
 10. The mission runner records inspection, collision, safety, battery, mapping, EKF-SLAM, localization, path-length, and timing metrics.
 
+Per-layer derivation notes live in [docs/design](docs/design/README.md). They cover the motion
+models, measurement models, update equations, pseudocode, acceptance benchmarks, and references
+for L0 through L5; `python docs/design/render_design_pdfs.py` regenerates PDF copies.
+
 ## Roadmap
 
 - Stress-test estimated-pose control across larger randomized scenario suites.
 - Use Hybrid A* as the default mission planner after more stress testing.
-- Add per-layer derivation notes for the motion, measurement, planning, and scheduling models.
+- Add richer demo GIFs, a narrated demo video, and CI-published benchmark badges.
 - Expand tests into coverage-gated CI.
 
 ## Why This Exists

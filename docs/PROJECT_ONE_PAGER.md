@@ -47,6 +47,9 @@ The mission runner can use ground-truth pose, particle-filter pose, or EKF-SLAM 
 
 The stress benchmark currently runs worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes complete with 100% success and zero collisions.
 
+Per-layer design notes live in [docs/design](design/README.md), with reproducible PDF rendering
+via `python docs/design/render_design_pdfs.py`.
+
 ## Reproduce
 
 ```bash
@@ -69,6 +72,7 @@ python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
 python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
+python docs/design/render_design_pdfs.py
 python -m pytest
 ```
 
@@ -76,5 +80,4 @@ python -m pytest
 
 - Stress-test KLD-adaptive particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
-- Add per-layer derivation notes for the motion, measurement, planning, and scheduling models.
 - Add coverage badges, richer demo GIFs, and a short narrated demo video.
