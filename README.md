@@ -99,6 +99,26 @@ Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. 
 
 ## Architecture
 
+```mermaid
+flowchart LR
+  world["Orchard world<br/>trees, rows, workers"] --> sensors["Sensor frame<br/>lidar, IMU, encoders"]
+  sensors --> tracker["L1 Kalman tracker<br/>worker predictions"]
+  sensors --> localizer["L2 MCL<br/>global pose belief"]
+  sensors --> slam["L3 EKF-SLAM<br/>pose + tree map"]
+  tracker --> planner["L4 planner<br/>grid A* / Hybrid A*"]
+  slam --> planner
+  localizer --> runner["Mission runner<br/>pose-source switch"]
+  slam --> runner
+  scheduler["L5 resource scheduler<br/>priority + battery + daylight"] --> planner
+  planner --> controller["L0 PID controller<br/>wheel commands"]
+  tracker --> safety["Safety supervisor<br/>command scaling"]
+  controller --> safety
+  safety --> rover["Differential-drive rover"]
+  rover --> world
+  rover --> battery["Battery model<br/>SOC + recharge contact"]
+  battery --> scheduler
+```
+
 ```text
 terrascout/
   sim/        orchard world, rover kinematics, sensor detections
