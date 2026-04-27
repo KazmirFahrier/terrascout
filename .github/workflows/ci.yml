@@ -21,6 +21,7 @@ jobs:
       - run: python benchmarks/control_benchmark.py
       - run: python benchmarks/tracking_benchmark.py
       - run: python benchmarks/localization_benchmark.py
+      - run: python benchmarks/scheduler_benchmark.py
       - run: python benchmarks/planner_benchmark.py
       - run: python benchmarks/slam_benchmark.py
       - run: python benchmarks/stress_benchmark.py

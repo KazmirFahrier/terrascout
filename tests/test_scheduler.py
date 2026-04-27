@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from terrascout.eval.benchmarks import run_scheduler_benchmark
 from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D
 
@@ -46,6 +47,13 @@ class InspectionSchedulerTest(unittest.TestCase):
 
         self.assertEqual(plan.order[0], 1)
         self.assertEqual(plan.dropped_goals, 0)
+
+    def test_scheduler_benchmark_matches_oracle(self) -> None:
+        rows = run_scheduler_benchmark(seeds=[2, 3, 5], goal_count=7)
+
+        self.assertLessEqual(max(row.optimality_gap_percent for row in rows), 0.01)
+        self.assertLess(max(row.wall_time_ms for row in rows), 800.0)
+        self.assertLessEqual(max(row.iterations for row in rows), 20)
 
 
 if __name__ == "__main__":

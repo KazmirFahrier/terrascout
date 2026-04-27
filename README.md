@@ -50,6 +50,7 @@ python benchmarks/run_benchmark.py
 python benchmarks/control_benchmark.py
 python benchmarks/tracking_benchmark.py
 python benchmarks/localization_benchmark.py
+python benchmarks/scheduler_benchmark.py
 python benchmarks/planner_benchmark.py
 python benchmarks/slam_benchmark.py
 python benchmarks/stress_benchmark.py
@@ -77,6 +78,8 @@ L0 control benchmark output is written to `artifacts/control_benchmark.csv`. It 
 L1 tracking benchmark output is written to `artifacts/tracking_benchmark.csv`. The benchmark evaluates 10 simultaneous moving workers over deterministic seeded scenes and reports 1-second prediction error plus ID-continuity association accuracy.
 
 L2 localization benchmark output is written to `artifacts/localization_benchmark.csv`. It evaluates particle-filter refinement from a coarse local pose prior and reports mean/p95 final pose error plus particle count.
+
+L5 scheduler benchmark output is written to `artifacts/scheduler_benchmark.csv`. It compares the MDP value-iteration route with a brute-force permutation oracle and reports optimality gap, iterations, and wall time.
 
 Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers around `ScenarioConfig`, so benchmark scenes can be reviewed and versioned without changing Python code.
 

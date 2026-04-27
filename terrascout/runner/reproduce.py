@@ -12,6 +12,7 @@ from terrascout.eval.benchmarks import (
     ControlBenchmarkRow,
     LocalizationBenchmarkRow,
     PlannerBenchmarkRow,
+    SchedulerBenchmarkRow,
     SlamBenchmarkRow,
     StressSummaryRow,
     TrackingBenchmarkRow,
@@ -19,6 +20,7 @@ from terrascout.eval.benchmarks import (
     run_control_benchmark,
     run_localization_benchmark,
     run_planner_benchmark,
+    run_scheduler_benchmark,
     run_slam_benchmark,
     run_stress_benchmark,
     run_tracking_benchmark,
@@ -56,6 +58,7 @@ def run_reproduce(
     control_rows = run_control_benchmark(artifacts_dir / "control_benchmark.csv")
     tracking_rows = run_tracking_benchmark(artifacts_dir / "tracking_benchmark.csv")
     localization_rows = run_localization_benchmark(artifacts_dir / "localization_benchmark.csv")
+    scheduler_rows = run_scheduler_benchmark(artifacts_dir / "scheduler_benchmark.csv")
     planner_rows = run_planner_benchmark(artifacts_dir / "planner_benchmark.csv")
     slam_rows = run_slam_benchmark(artifacts_dir / "slam_benchmark.csv")
     stress_rows = run_stress_benchmark(
@@ -70,6 +73,7 @@ def run_reproduce(
         control_rows=control_rows,
         tracking_rows=tracking_rows,
         localization_rows=localization_rows,
+        scheduler_rows=scheduler_rows,
         planner_rows=planner_rows,
         slam_rows=slam_rows,
         stress_rows=stress_rows,
@@ -88,6 +92,7 @@ def build_reproduce_summary(
     control_rows: list[ControlBenchmarkRow],
     tracking_rows: list[TrackingBenchmarkRow],
     localization_rows: list[LocalizationBenchmarkRow],
+    scheduler_rows: list[SchedulerBenchmarkRow],
     planner_rows: list[PlannerBenchmarkRow],
     slam_rows: list[SlamBenchmarkRow],
     stress_rows: list[StressSummaryRow],
@@ -126,6 +131,14 @@ def build_reproduce_summary(
             "localization_p95_pose_error_m": _percentile(
                 [row.final_pose_error_m for row in localization_rows],
                 95,
+            ),
+            "scheduler_max_optimality_gap_percent": max(
+                (row.optimality_gap_percent for row in scheduler_rows),
+                default=0.0,
+            ),
+            "scheduler_max_wall_time_ms": max(
+                (row.wall_time_ms for row in scheduler_rows),
+                default=0.0,
             ),
             "planner_mean_wall_time_ms": {
                 "grid_astar": _mean(

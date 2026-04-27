@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import asdict, dataclass
+from itertools import permutations
 from math import hypot, pi
 from pathlib import Path
 from time import perf_counter
@@ -18,6 +19,7 @@ from terrascout.mapping.ekf_slam import EkfSlam
 from terrascout.plan.astar import GridAStarPlanner
 from terrascout.plan.hybrid_astar import HybridAStarPlanner
 from terrascout.runner.mission import MissionMetrics, run_mission, write_metrics_csv
+from terrascout.scheduler.value_iteration import InspectionScheduler
 from terrascout.sim.geometry import Point2D, Pose2D, distance, wrap_angle
 from terrascout.sim.rover import DifferentialDriveRover
 from terrascout.sim.world import LidarDetection, OrchardWorld, ScenarioConfig
@@ -69,6 +71,17 @@ class LocalizationBenchmarkRow:
     prior_heading_error_deg: float
     final_pose_error_m: float
     particle_count: int
+    wall_time_ms: float
+
+
+@dataclass(frozen=True)
+class SchedulerBenchmarkRow:
+    seed: int
+    goal_count: int
+    scheduler_value: float
+    oracle_value: float
+    optimality_gap_percent: float
+    iterations: int
     wall_time_ms: float
 
 
@@ -338,6 +351,42 @@ def run_localization_benchmark(
     return rows
 
 
+def run_scheduler_benchmark(
+    output: Path = Path("artifacts/scheduler_benchmark.csv"),
+    seeds: Sequence[int] | None = None,
+    goal_count: int = 7,
+) -> list[SchedulerBenchmarkRow]:
+    """Compare the MDP scheduler policy with a brute-force permutation oracle."""
+
+    rows: list[SchedulerBenchmarkRow] = []
+    start = Pose2D(0.0, 0.0, 0.0)
+    for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
+        rng = np.random.default_rng(seed)
+        goals = _random_scheduler_goals(rng, goal_count)
+        priorities = [float(rng.uniform(0.7, 1.8)) for _ in goals]
+        scheduler = InspectionScheduler()
+        started = perf_counter()
+        order = scheduler.plan_order(start, goals, priorities)
+        scheduler_value = _schedule_order_value(start, goals, priorities, order)
+        oracle_value = _scheduler_oracle_value(start, goals, priorities)
+        wall_time_ms = (perf_counter() - started) * 1000.0
+        gap = max(0.0, oracle_value - scheduler_value) / max(1.0, abs(oracle_value)) * 100.0
+        rows.append(
+            SchedulerBenchmarkRow(
+                seed=seed,
+                goal_count=goal_count,
+                scheduler_value=scheduler_value,
+                oracle_value=oracle_value,
+                optimality_gap_percent=gap,
+                iterations=scheduler.iterations,
+                wall_time_ms=wall_time_ms,
+            )
+        )
+
+    _write_csv(rows, output)
+    return rows
+
+
 def run_stress_benchmark(
     seeds: Sequence[int] | None = None,
     scenarios: Sequence[StressScenario] | None = None,
@@ -491,6 +540,47 @@ def _advance_workers(
 
 def _mean(values: Sequence[float]) -> float:
     return sum(values) / len(values) if values else 0.0
+
+
+def _random_scheduler_goals(rng: np.random.Generator, goal_count: int) -> list[Point2D]:
+    return [
+        Point2D(
+            x=float(rng.uniform(2.0, 20.0)),
+            y=float(rng.uniform(0.0, 18.0)),
+        )
+        for _ in range(goal_count)
+    ]
+
+
+def _schedule_order_value(
+    start: Pose2D,
+    goals: list[Point2D],
+    priorities: list[float],
+    order: Sequence[int],
+) -> float:
+    scheduler = InspectionScheduler()
+    cfg = scheduler.config
+    value = 0.0
+    position = len(goals)
+    for depth, action in enumerate(order):
+        origin_x = start.x if position == len(goals) else goals[position].x
+        origin_y = start.y if position == len(goals) else goals[position].y
+        travel_m = hypot(goals[action].x - origin_x, goals[action].y - origin_y)
+        reward = cfg.inspection_reward * priorities[action] - cfg.travel_cost_per_m * travel_m
+        value += (cfg.discount**depth) * reward
+        position = action
+    return value
+
+
+def _scheduler_oracle_value(
+    start: Pose2D,
+    goals: list[Point2D],
+    priorities: list[float],
+) -> float:
+    return max(
+        _schedule_order_value(start, goals, priorities, order)
+        for order in permutations(range(len(goals)))
+    )
 
 
 def percentile(values: Sequence[float], percentile_value: float) -> float:
