@@ -1,4 +1,4 @@
-"""Run a deterministic EKF-SLAM smoke benchmark."""
+"""Run the TerraScout L3 EKF-SLAM acceptance benchmark."""
 
 from __future__ import annotations
 

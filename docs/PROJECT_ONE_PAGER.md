@@ -35,12 +35,12 @@ benchmark uses 100 deterministic scenes (`0..99`).
 | Scheduler oracle gap | 0% on deterministic 7-goal benchmark |
 | Resource scheduler oracle gap | 0% across 50 constrained randomized layouts |
 | Hybrid A* steering effort | >80% lower than grid A* baseline |
-| EKF-SLAM map accuracy | <0.10 m mean landmark error on deterministic traversal |
+| EKF-SLAM map accuracy | <0.12 m worst mean landmark error across 10 large layouts |
 | Mean localization error | ~0.19 m |
 | EKF-SLAM landmarks in mission | 89 |
 | Scheduler dropped goals | 0 |
 | 30-row acceptance pass | 10/10 priority goals, 0 collisions, 0.199 m mean pose error |
-| 30-row wall time | 12.43 s max over 20 seeded missions |
+| 30-row wall time | 12.20 s max over 20 seeded missions |
 | Final battery SOC | ~90% |
 | Mean mission wall time | ~3.0 s |
 | Runtime safety layer | Reports interventions, stops, and minimum perceived worker clearance |

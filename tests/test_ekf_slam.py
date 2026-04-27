@@ -36,10 +36,10 @@ class EkfSlamTest(unittest.TestCase):
     def test_slam_benchmark_reports_pose_and_landmark_accuracy(self) -> None:
         rows = run_slam_benchmark(seeds=[7])
 
-        self.assertGreater(rows[0].landmark_count, 30)
-        self.assertLess(rows[0].final_pose_error_m, 0.15)
-        self.assertLess(rows[0].mean_landmark_error_m, 0.10)
-        self.assertLess(rows[0].p95_landmark_error_m, 0.20)
+        self.assertGreaterEqual(rows[0].landmark_count, 120)
+        self.assertLess(rows[0].final_pose_error_m, 0.20)
+        self.assertLess(rows[0].mean_landmark_error_m, 0.30)
+        self.assertLess(rows[0].p95_landmark_error_m, 0.35)
 
 
 if __name__ == "__main__":

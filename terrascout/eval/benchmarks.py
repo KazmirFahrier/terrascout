@@ -143,6 +143,7 @@ class StressSummaryRow:
 
 DEFAULT_BENCHMARK_SEEDS = [2, 3, 5, 7, 11]
 TRACKING_ACCEPTANCE_SEEDS = list(range(100))
+SLAM_ACCEPTANCE_SEEDS = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]
 DEFAULT_STRESS_SEEDS = [2, 7, 11]
 DEFAULT_ACCEPTANCE_SEEDS = [
     2,
@@ -263,26 +264,36 @@ def run_slam_benchmark(
     output: Path = Path("artifacts/slam_benchmark.csv"),
     seeds: Sequence[int] | None = None,
 ) -> list[SlamBenchmarkRow]:
-    """Run a deterministic EKF-SLAM smoke benchmark."""
+    """Run 5-minute EKF-SLAM traversals across 12x30 orchard layouts."""
 
     rows: list[SlamBenchmarkRow] = []
-    commands = [
-        (0.9, 0.0, 8),
-        (0.8, 0.18, 8),
-        (0.9, 0.0, 8),
-        (0.8, -0.18, 8),
-        (0.9, 0.0, 8),
-    ]
-    for seed in list(seeds or DEFAULT_BENCHMARK_SEEDS):
-        world = OrchardWorld(ScenarioConfig(rows=8, trees_per_row=14, worker_count=0, random_seed=seed))
-        truth = Pose2D(2.0, 1.5, 1.1)
-        slam = EkfSlam(truth)
+    dt = 0.75
+    steps = int(300.0 / dt)
+    for seed in list(seeds or SLAM_ACCEPTANCE_SEEDS):
+        world = OrchardWorld(ScenarioConfig(rows=12, trees_per_row=30, worker_count=0, random_seed=seed))
+        start_pose = Pose2D(
+            world.config.width_margin_m + 0.5 * world.config.row_spacing_m,
+            1.0,
+            pi / 2.0,
+        )
+        rover = DifferentialDriveRover(pose=start_pose)
+        slam = EkfSlam(start_pose)
+        controller = DriveController.default()
+        waypoints = _slam_acceptance_waypoints(world)
+        waypoint_index = 0
         started = perf_counter()
-        for linear_mps, angular_rps, steps in commands:
-            for _ in range(steps):
-                truth = _slam_truth_step(truth, linear_mps, angular_rps, dt=0.5)
-                slam.predict(linear_mps=linear_mps, angular_rps=angular_rps, dt=0.5)
-                slam.update(world.local_lidar_detections(truth, include_workers=False))
+        for _ in range(steps):
+            waypoint = waypoints[waypoint_index]
+            if distance(rover.pose, waypoint) < 0.8 and waypoint_index < len(waypoints) - 1:
+                waypoint_index += 1
+                waypoint = waypoints[waypoint_index]
+            left, right = controller.wheel_commands(rover.pose, waypoint, dt)
+            linear_mps = 0.5 * (left + right)
+            angular_rps = (right - left) / rover.wheel_base_m
+            rover.command(left, right)
+            rover.step(dt)
+            slam.predict(linear_mps=linear_mps, angular_rps=angular_rps, dt=dt)
+            slam.update(world.local_lidar_detections(rover.pose, include_workers=False))
         mean_observations = (
             sum(slam.landmark_observations) / len(slam.landmark_observations)
             if slam.landmark_observations
@@ -294,7 +305,7 @@ def run_slam_benchmark(
                 seed=seed,
                 landmark_count=slam.landmark_count,
                 mean_observations=mean_observations,
-                final_pose_error_m=distance(slam.pose, truth),
+                final_pose_error_m=distance(slam.pose, rover.pose),
                 mean_landmark_error_m=_mean(landmark_errors),
                 p95_landmark_error_m=percentile(landmark_errors, 95),
                 covariance_trace=float(slam.covariance.trace()),
@@ -304,6 +315,18 @@ def run_slam_benchmark(
 
     _write_csv(rows, output)
     return rows
+
+
+def _slam_acceptance_waypoints(world: OrchardWorld) -> list[Point2D]:
+    """Return a 5-minute serpentine traversal through a large orchard block."""
+
+    return [
+        Point2D(
+            world.config.width_margin_m + (lane + 0.5) * world.config.row_spacing_m,
+            world.height_y - 1.0 if lane % 2 == 0 else 1.0,
+        )
+        for lane in range(4)
+    ]
 
 
 def run_tracking_benchmark(
@@ -624,15 +647,6 @@ def _point_steering_effort(points: Sequence[Point2D], start_theta: float) -> flo
 
 def _pose_steering_effort(poses: Sequence[Pose2D]) -> float:
     return sum(abs(wrap_angle(b.theta - a.theta)) for a, b in zip(poses, poses[1:]))
-
-
-def _slam_truth_step(pose: Pose2D, linear_mps: float, angular_rps: float, dt: float) -> Pose2D:
-    theta_mid = pose.theta + 0.5 * angular_rps * dt
-    return Pose2D(
-        x=pose.x + linear_mps * cos(theta_mid) * dt,
-        y=pose.y + linear_mps * sin(theta_mid) * dt,
-        theta=wrap_angle(pose.theta + angular_rps * dt),
-    )
 
 
 def _landmark_errors(estimated: Sequence[Point2D], truth: Sequence[Point2D]) -> list[float]:
