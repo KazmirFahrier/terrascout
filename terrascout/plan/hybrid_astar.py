@@ -33,6 +33,8 @@ class HybridPlannerConfig:
     turn_cost: float = 0.12
     reverse_cost: float = 0.9
     heading_cost: float = 0.15
+    analytic_expansion_distance_m: float = 7.0
+    analytic_step_m: float = 0.35
 
 
 class HybridAStarPlanner:
@@ -53,6 +55,9 @@ class HybridAStarPlanner:
 
         goal_pose = goal if isinstance(goal, Pose2D) else Pose2D(goal.x, goal.y, 0.0)
         blocked = self.grid_planner._occupancy_grid(predicted_workers)
+        direct = self._analytic_connector(start, goal_pose, blocked)
+        if direct is not None:
+            return direct
         start_key = self._key(start)
         start_key = self._nearest_free_state(start_key, blocked)
 
@@ -70,6 +75,13 @@ class HybridAStarPlanner:
             expansions += 1
             if self._reached(current_pose, goal_pose):
                 return self._reconstruct(came_from, poses, current_key, goal_pose)
+            if hypot(goal_pose.x - current_pose.x, goal_pose.y - current_pose.y) <= (
+                self.config.analytic_expansion_distance_m
+            ):
+                connector = self._analytic_connector(current_pose, goal_pose, blocked)
+                if connector is not None:
+                    prefix = self._reconstruct(came_from, poses, current_key, current_pose)
+                    return self._sparsify([*prefix[:-1], *connector])
 
             for next_pose, primitive_cost in self._expand(current_pose):
                 next_key = self._key(next_pose)
@@ -180,3 +192,81 @@ class HybridAStarPlanner:
         if not poses or hypot(poses[-1].x - goal.x, poses[-1].y - goal.y) > 1e-6:
             poses.append(goal)
         return poses
+
+    def _analytic_connector(
+        self,
+        start: Pose2D,
+        goal: Pose2D,
+        blocked: NDArray[np.bool_],
+    ) -> list[Pose2D] | None:
+        """Try a bounded-curvature forward/reverse connector to the goal."""
+
+        best_path: list[Pose2D] | None = None
+        for allow_reverse in (False, True):
+            candidate = self._simulate_connector(start, goal, blocked, allow_reverse=allow_reverse)
+            if candidate is not None and (best_path is None or len(candidate) < len(best_path)):
+                best_path = candidate
+        return best_path
+
+    def _simulate_connector(
+        self,
+        start: Pose2D,
+        goal: Pose2D,
+        blocked: NDArray[np.bool_],
+        allow_reverse: bool,
+    ) -> list[Pose2D] | None:
+        step = self.config.analytic_step_m
+        max_turn = step / self.config.min_turn_radius_m
+        pose = start
+        path = [start]
+        max_steps = max(12, int(3.0 * hypot(goal.x - start.x, goal.y - start.y) / step) + 12)
+
+        for _ in range(max_steps):
+            distance_to_goal = hypot(goal.x - pose.x, goal.y - pose.y)
+            if distance_to_goal <= self.config.goal_tolerance_m:
+                if not self._connector_segment_free(pose, goal, blocked):
+                    return None
+                path.append(goal)
+                return self._sparsify(path)
+
+            heading_to_goal = atan2(goal.y - pose.y, goal.x - pose.x)
+            forward_error = wrap_angle(heading_to_goal - pose.theta)
+            direction = 1.0
+            desired_heading = heading_to_goal
+            if allow_reverse and abs(forward_error) > pi / 2.0:
+                direction = -1.0
+                desired_heading = wrap_angle(heading_to_goal + pi)
+
+            turn = max(-max_turn, min(max_turn, wrap_angle(desired_heading - pose.theta)))
+            next_pose = self._integrate_arc(pose, direction, turn, min(step, distance_to_goal))
+            if not self._connector_segment_free(pose, next_pose, blocked):
+                return None
+            path.append(next_pose)
+            pose = next_pose
+
+        return None
+
+    def _integrate_arc(self, pose: Pose2D, direction: float, turn: float, step_m: float) -> Pose2D:
+        theta_mid = pose.theta + 0.5 * direction * turn
+        return Pose2D(
+            x=pose.x + direction * step_m * cos(theta_mid),
+            y=pose.y + direction * step_m * sin(theta_mid),
+            theta=wrap_angle(pose.theta + direction * turn),
+        )
+
+    def _connector_segment_free(
+        self,
+        start: Pose2D,
+        end: Pose2D,
+        blocked: NDArray[np.bool_],
+    ) -> bool:
+        distance_m = hypot(end.x - start.x, end.y - start.y)
+        samples = max(1, int(distance_m / (0.5 * self.config.grid.resolution_m)))
+        for idx in range(samples + 1):
+            fraction = idx / samples
+            x = start.x + (end.x - start.x) * fraction
+            y = start.y + (end.y - start.y) * fraction
+            cell = self.grid_planner._to_cell(x, y)
+            if not self._is_free((cell[0], cell[1], 0), blocked):
+                return False
+        return True

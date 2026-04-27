@@ -16,7 +16,7 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Online Gaussian tree-landmark mapping from local range/bearing detections.
 - Compact EKF-SLAM back end with state expansion, covariance propagation, and range/bearing updates.
 - Grid A* path planning over inflated tree and worker obstacles.
-- Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives.
+- Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives and an analytic bounded-curvature connector.
 - Resource-aware inspection scheduler over row priority, travel cost, battery, and daylight budgets.
 - Battery state-of-charge model with recharge-station contact telemetry.
 - Runtime safety supervisor that scales wheel commands near perceived or predicted workers.
@@ -88,7 +88,7 @@ L5 scheduler benchmark output is written to `artifacts/scheduler_benchmark.csv`.
 
 Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers around `ScenarioConfig`, so benchmark scenes can be reviewed and versioned without changing Python code.
 
-Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* averaged ~55 ms per plan while returning sparse heading-aware pose paths with >80% lower steering effort.
+Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* stayed under ~50 ms per plan while returning sparse heading-aware pose paths with >80% lower steering effort.
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark observes about 39 tree landmarks and reports final pose plus landmark-map error against ground truth.
 

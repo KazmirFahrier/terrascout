@@ -64,9 +64,12 @@ y' = y + direction * step * sin(theta_mid)
 theta' = wrap(theta + direction * turn)
 ```
 
-The current implementation uses a minimum-turn-radius lattice (`r_min = 1.2 m`) and reverse
-penalties. It does not yet add an analytic Reeds-Shepp expansion, so the README and benchmarks
-describe the planner as heading-aware Hybrid A* with forward/reverse arc primitives.
+The implementation uses a minimum-turn-radius lattice (`r_min = 1.2 m`), reverse penalties, and
+a lightweight analytic connector. The connector simulates bounded-curvature forward and reverse
+approaches to the goal and accepts the connector only when all sampled poses remain in free
+space. This is not a full optimal Reeds-Shepp solver, but it provides the same Hybrid A*
+analytic-expansion role: quickly finish near-goal states with feasible curvature before falling
+back to lattice expansion.
 
 ## Cost And Heuristic
 
@@ -84,19 +87,25 @@ Heuristic:
 h = EuclideanDistance(p, goal) + heading_cost * abs(wrap(heading_to_goal - theta))
 ```
 
-The planner stops when the pose enters `goal_tolerance_m` of the goal. If the search exceeds
-`max_expansions`, it falls back to the grid A* baseline and annotates heading from path segments.
+The planner first tries the analytic connector directly from the start. During lattice search, it
+tries the connector again whenever a state is within `analytic_expansion_distance_m` of the goal.
+If the search exceeds `max_expansions`, it falls back to the grid A* baseline and annotates
+heading from path segments.
 
 ## Pseudocode
 
 ```text
 function hybrid_plan(start, goal, predicted_workers):
     blocked = inflated occupancy grid
+    if analytic_connector(start, goal) is collision-free:
+        return connector path
     open = priority queue with start
     while open is not empty and expansions < max_expansions:
         current = pop best f = g + h
         if current reaches goal:
             return reconstruct path
+        if current is near goal and analytic_connector(current, goal) is collision-free:
+            return reconstruct prefix + connector
         for primitive in forward/reverse arc primitives:
             next = integrate primitive
             if next cell is free and tentative cost improves:
@@ -108,7 +117,8 @@ function hybrid_plan(start, goal, predicted_workers):
 
 The planner benchmark compares grid A* and Hybrid A* on deterministic orchard scenes and reports
 waypoint count, path length, steering effort, and wall time. Current results show the Hybrid A*
-path has much lower steering effort than the grid baseline while staying within the CPU budget.
+path has much lower steering effort than the grid baseline while the analytic connector keeps
+planning time comfortably within the CPU budget.
 
 ## References
 

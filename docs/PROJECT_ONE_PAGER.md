@@ -12,7 +12,7 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 | L1 Tracking | Kalman filter | Constant-velocity worker tracker from noisy lidar cluster detections |
 | L2 Localization | KLD-adaptive particle filter | Coarse-to-fine MCL relocalization against orchard tree landmarks |
 | L3 Mapping | EKF-SLAM | Compact state/covariance SLAM with range/bearing landmark updates |
-| L4 Planning | Grid A* + Hybrid A* | Fast grid routing plus heading-aware Hybrid A* arc primitives |
+| L4 Planning | Grid A* + Hybrid A* | Fast grid routing plus heading-aware arc primitives and analytic connector |
 | L5 Scheduling | Resource-aware value search | Row scheduling under priority, travel cost, battery, and daylight budgets |
 | L6 Battery | Energy accounting | State-of-charge drain and recharge-station contact metrics |
 | L7 Safety | Command supervision | Wheel-command scaling near perceived or predicted workers |

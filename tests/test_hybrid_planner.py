@@ -10,6 +10,21 @@ from terrascout.sim.world import OrchardWorld, ScenarioConfig
 
 
 class HybridAStarPlannerTest(unittest.TestCase):
+    def test_analytic_connector_solves_clear_path_before_lattice_search(self) -> None:
+        world = OrchardWorld(ScenarioConfig(rows=4, trees_per_row=4, worker_count=0, random_seed=1))
+        planner = HybridAStarPlanner(
+            world,
+            HybridPlannerConfig(max_expansions=0, goal_tolerance_m=0.2),
+        )
+        start = Pose2D(0.6, 0.6, 0.0)
+        goal = Pose2D(7.0, 0.6, 0.0)
+
+        path = planner.plan(start, goal)
+
+        self.assertEqual(path[0], start)
+        self.assertEqual(path[-1], goal)
+        self.assertLessEqual(len(path), 3)
+
     def test_hybrid_planner_returns_heading_aware_path(self) -> None:
         world = OrchardWorld(ScenarioConfig(rows=5, trees_per_row=8, worker_count=0, random_seed=2))
         planner = HybridAStarPlanner(
