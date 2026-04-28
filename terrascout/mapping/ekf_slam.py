@@ -28,6 +28,7 @@ class EkfSlamConfig:
     range_sigma: float = 0.08
     bearing_sigma: float = 0.03
     association_gate_m: float = 0.8
+    mahalanobis_gate: float = 9.21
     innovation_gate: float = 1.5
     max_landmarks: int = 160
     max_updates_per_scan: int = 16
@@ -103,12 +104,29 @@ class EkfSlam:
         if self.landmark_count == 0:
             return None
         observed = self._detection_to_global(detection)
-        distances = [
-            hypot(observed[0] - landmark.x, observed[1] - landmark.y)
-            for landmark in self.landmarks()
-        ]
-        idx = int(np.argmin(distances))
-        return idx if distances[idx] <= self.config.association_gate_m else None
+        best_index: int | None = None
+        best_distance = float("inf")
+        best_mahalanobis = float("inf")
+        for idx, landmark in enumerate(self.landmarks()):
+            distance_m = hypot(observed[0] - landmark.x, observed[1] - landmark.y)
+            if distance_m > self.config.association_gate_m:
+                continue
+            measurement = self._measurement_terms(idx, detection, full_jacobian=False)
+            if measurement is None:
+                continue
+            innovation, h, covariance_indices = measurement
+            mahalanobis = self._mahalanobis_distance(innovation, h, covariance_indices)
+            if mahalanobis is None:
+                continue
+            if mahalanobis < best_mahalanobis:
+                best_index = idx
+                best_distance = distance_m
+                best_mahalanobis = mahalanobis
+            elif mahalanobis == best_mahalanobis and distance_m < best_distance:
+                best_index = idx
+                best_distance = distance_m
+
+        return best_index if best_mahalanobis <= self.config.mahalanobis_gate else None
 
     def _append_landmark(self, detection: LocalLidarDetection) -> None:
         if self.landmark_count >= self.config.max_landmarks:
@@ -125,40 +143,16 @@ class EkfSlam:
 
     def _update_landmark(self, landmark_index: int, detection: LocalLidarDetection) -> None:
         self._stabilize_covariance()
-        landmark_offset = 3 + 2 * landmark_index
-        dx = float(self.mean[landmark_offset] - self.mean[0])
-        dy = float(self.mean[landmark_offset + 1] - self.mean[1])
-        q = max(dx * dx + dy * dy, 1e-9)
-        if q < 0.01:
+        measurement = self._measurement_terms(landmark_index, detection, full_jacobian=True)
+        if measurement is None:
             return
-        predicted_range = q**0.5
-        predicted_bearing = wrap_angle(atan2(dy, dx) - float(self.mean[2]))
-        innovation = np.array(
-            [
-                detection.range_m - predicted_range,
-                wrap_angle(detection.bearing_rad - predicted_bearing),
-            ],
-            dtype=float,
-        )
+        innovation, h, _covariance_indices = measurement
         if (
             abs(float(innovation[0])) > self.config.innovation_gate
             or abs(float(innovation[1])) > self.config.innovation_gate
         ):
             return
-
-        h = np.zeros((2, len(self.mean)), dtype=float)
-        sqrt_q = q**0.5
-        h[0, 0] = -dx / sqrt_q
-        h[0, 1] = -dy / sqrt_q
-        h[0, landmark_offset] = dx / sqrt_q
-        h[0, landmark_offset + 1] = dy / sqrt_q
-        h[1, 0] = dy / q
-        h[1, 1] = -dx / q
-        h[1, 2] = -1.0
-        h[1, landmark_offset] = -dy / q
-        h[1, landmark_offset + 1] = dx / q
-
-        measurement_noise = np.diag([self.config.range_sigma**2, self.config.bearing_sigma**2])
+        measurement_noise = self._measurement_noise()
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
             innovation_covariance = h @ self.covariance @ h.T + measurement_noise
         if (
@@ -182,6 +176,89 @@ class EkfSlam:
             )
         self._stabilize_covariance()
         self.landmark_observations[landmark_index] += 1
+
+    def _measurement_terms(
+        self,
+        landmark_index: int,
+        detection: LocalLidarDetection,
+        full_jacobian: bool,
+    ) -> tuple[NDArray[np.float64], NDArray[np.float64], list[int] | None] | None:
+        landmark_offset = 3 + 2 * landmark_index
+        dx = float(self.mean[landmark_offset] - self.mean[0])
+        dy = float(self.mean[landmark_offset + 1] - self.mean[1])
+        q = max(dx * dx + dy * dy, 1e-9)
+        if q < 0.01:
+            return None
+        predicted_range = q**0.5
+        predicted_bearing = wrap_angle(atan2(dy, dx) - float(self.mean[2]))
+        innovation = np.array(
+            [
+                detection.range_m - predicted_range,
+                wrap_angle(detection.bearing_rad - predicted_bearing),
+            ],
+            dtype=float,
+        )
+        if (
+            not np.all(np.isfinite(innovation))
+            or abs(float(innovation[0])) > self.config.innovation_gate
+            or abs(float(innovation[1])) > self.config.innovation_gate
+        ):
+            return None
+
+        covariance_indices = [0, 1, 2, landmark_offset, landmark_offset + 1]
+        if full_jacobian:
+            h = np.zeros((2, len(self.mean)), dtype=float)
+            robot_x = 0
+            robot_y = 1
+            robot_theta = 2
+            landmark_x = landmark_offset
+            landmark_y = landmark_offset + 1
+        else:
+            h = np.zeros((2, len(covariance_indices)), dtype=float)
+            robot_x = 0
+            robot_y = 1
+            robot_theta = 2
+            landmark_x = 3
+            landmark_y = 4
+        sqrt_q = q**0.5
+        h[0, robot_x] = -dx / sqrt_q
+        h[0, robot_y] = -dy / sqrt_q
+        h[0, landmark_x] = dx / sqrt_q
+        h[0, landmark_y] = dy / sqrt_q
+        h[1, robot_x] = dy / q
+        h[1, robot_y] = -dx / q
+        h[1, robot_theta] = -1.0
+        h[1, landmark_x] = -dy / q
+        h[1, landmark_y] = dx / q
+        return innovation, h, None if full_jacobian else covariance_indices
+
+    def _mahalanobis_distance(
+        self,
+        innovation: NDArray[np.float64],
+        h: NDArray[np.float64],
+        covariance_indices: list[int] | None,
+    ) -> float | None:
+        measurement_noise = self._measurement_noise()
+        covariance = (
+            self.covariance
+            if covariance_indices is None
+            else self.covariance[np.ix_(covariance_indices, covariance_indices)]
+        )
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            innovation_covariance = h @ covariance @ h.T + measurement_noise
+        if (
+            not np.all(np.isfinite(innovation_covariance))
+            or np.linalg.cond(innovation_covariance) > 1e10
+        ):
+            return None
+        with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
+            weighted = np.linalg.solve(innovation_covariance, innovation)
+        if not np.all(np.isfinite(weighted)):
+            return None
+        return float(innovation.T @ weighted)
+
+    def _measurement_noise(self) -> NDArray[np.float64]:
+        return np.diag([self.config.range_sigma**2, self.config.bearing_sigma**2])
 
     def _detection_to_global(self, detection: LocalLidarDetection) -> NDArray[np.float64]:
         theta = float(self.mean[2] + detection.bearing_rad)

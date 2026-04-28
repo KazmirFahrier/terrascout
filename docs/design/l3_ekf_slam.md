@@ -6,7 +6,7 @@ L3 builds an online tree-landmark map while estimating rover pose. TerraScout us
 EKF-SLAM state because the simulated orchard landmarks are point-like tree trunks and the current
 mission lengths fit comfortably in memory.
 
-Implementation: `terrascout/mapping/ekf_slam.py`
+Implementation: `terrascout/mapping/ekf_slam.py` and `terrascout/mapping/trunks.py`
 
 Benchmark: `benchmarks/slam_benchmark.py`
 
@@ -20,6 +20,32 @@ Sigma = joint covariance over robot pose and landmarks
 ```
 
 Each landmark is a 2D tree-trunk point in the global frame.
+
+## Trunk Detector
+
+The simulator emits full 270-degree / 0.5-degree lidar scans. The trunk detector converts finite
+scan returns into rover-frame points, splits contiguous returns into local clusters, then fits a
+circle to each cluster using deterministic three-point RANSAC plus a least-squares refinement over
+the inliers.
+
+Accepted detections must satisfy:
+
+```text
+min_cluster_points <= cluster_size
+min_radius_m <= fitted_radius <= max_radius_m
+inlier_count >= min_inliers
+|distance(point, center) - radius| <= inlier_tolerance_m
+```
+
+The fitted center is converted back into a range/bearing `tree` detection for mapping and SLAM:
+
+```text
+range = sqrt(center_x^2 + center_y^2)
+bearing = atan2(center_y, center_x)
+```
+
+RANSAC model enumeration is capped with deterministic sampled triples so long orchard-edge clusters
+cannot dominate benchmark runtime.
 
 ## Prediction Model
 
@@ -94,12 +120,20 @@ The Joseph-form covariance update is used for better numerical stability.
 
 ## Landmark Association
 
-TerraScout converts each range/bearing detection to a global point using the current pose
-estimate and associates it to the nearest existing landmark if the Euclidean distance is within
-`association_gate_m`. Otherwise, a new landmark is appended until `max_landmarks` is reached.
+TerraScout converts each range/bearing detection to a global point using the current pose estimate
+and first applies a Euclidean pre-gate. Candidate landmarks then compete using the Mahalanobis
+distance of the range/bearing innovation:
 
-Innovations larger than the configured gate are rejected to avoid corrupting the map with row
-aliases or worker detections.
+```text
+d_M = nu^T S^-1 nu
+S = H Sigma H^T + Q
+```
+
+The lowest-distance candidate is accepted only when `d_M <= mahalanobis_gate`. Otherwise, a new
+landmark is appended until `max_landmarks` is reached.
+
+Innovations larger than the configured gate or Mahalanobis threshold are rejected to avoid
+corrupting the map with row aliases or worker detections.
 
 ## Pseudocode
 
@@ -111,12 +145,12 @@ function predict(v, omega, dt):
 
 function update(detections):
     for tree detection in scan:
-        landmark = nearest associated landmark
+        landmark = best Mahalanobis-gated landmark
         if no landmark:
             append landmark from detection
         else:
             compute range/bearing innovation
-            if innovation inside gate:
+            if innovation inside gate and Mahalanobis distance inside gate:
                 apply EKF update
 ```
 

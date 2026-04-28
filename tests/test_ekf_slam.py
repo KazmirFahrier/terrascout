@@ -5,9 +5,9 @@ import unittest
 import numpy as np
 
 from terrascout.eval.benchmarks import run_slam_benchmark
-from terrascout.mapping.ekf_slam import EkfSlam
+from terrascout.mapping.ekf_slam import EkfSlam, EkfSlamConfig
 from terrascout.sim.geometry import Pose2D, distance
-from terrascout.sim.world import OrchardWorld, ScenarioConfig
+from terrascout.sim.world import LocalLidarDetection, OrchardWorld, ScenarioConfig
 
 
 class EkfSlamTest(unittest.TestCase):
@@ -32,6 +32,25 @@ class EkfSlamTest(unittest.TestCase):
         slam.predict(linear_mps=1.0, angular_rps=0.0, dt=1.0)
 
         self.assertLess(distance(slam.pose, Pose2D(1.0, 0.0, 0.0)), 0.05)
+
+    def test_ekf_slam_rejects_mahalanobis_outlier(self) -> None:
+        slam = EkfSlam(
+            Pose2D(0.0, 0.0, 0.0),
+            EkfSlamConfig(
+                association_gate_m=10.0,
+                mahalanobis_gate=0.01,
+                innovation_gate=100.0,
+                max_landmarks=1,
+            ),
+        )
+        slam.update([LocalLidarDetection(range_m=3.0, bearing_rad=0.0, kind="tree")])
+        covariance_trace = float(np.trace(slam.covariance))
+
+        slam.update([LocalLidarDetection(range_m=3.6, bearing_rad=0.2, kind="tree")])
+
+        self.assertEqual(slam.landmark_count, 1)
+        self.assertEqual(slam.landmark_observations, [1])
+        self.assertAlmostEqual(float(np.trace(slam.covariance)), covariance_trace)
 
     def test_slam_benchmark_reports_pose_and_landmark_accuracy(self) -> None:
         rows = run_slam_benchmark(seeds=[7])

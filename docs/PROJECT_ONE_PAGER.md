@@ -11,7 +11,7 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 | L0 Control | PID | Twin-loop waypoint tracking for differential-drive wheel commands |
 | L1 Tracking | Kalman filter | Constant-velocity worker tracker from noisy lidar cluster detections |
 | L2 Localization | KLD-adaptive particle filter | Coarse-to-fine MCL relocalization against orchard tree landmarks |
-| L3 Mapping | EKF-SLAM | Compact state/covariance SLAM with range/bearing landmark updates |
+| L3 Mapping | RANSAC trunks + EKF-SLAM | Scan clustering, circle-fit trunk detections, Mahalanobis association, and range/bearing landmark updates |
 | L4 Planning | Grid A* + Hybrid A* | Fast grid routing plus heading-aware arc primitives and analytic connector |
 | L5 Scheduling | Resource-aware value search | Row scheduling under priority, travel cost, battery, and daylight budgets |
 | L6 Battery | Energy accounting | State-of-charge drain and recharge-station contact metrics |
@@ -32,6 +32,7 @@ benchmark uses 100 deterministic scenes (`0..99`).
 | 100-scene 10-worker tracking prediction | <0.05 m mean 1-second error |
 | 100-scene 10-worker association accuracy | 100% on deterministic benchmark |
 | Particle-filter relocalization | <0.03 m p95 using <=169 particles from +/-5 m, +/-30 degree prior |
+| Lidar trunk detector | Fits circular tree trunks from 270-degree scans with deterministic RANSAC |
 | Scheduler oracle gap | 0% on deterministic 7-goal benchmark |
 | Resource scheduler oracle gap | 0% across 50 constrained randomized layouts |
 | Hybrid A* steering effort | >80% lower than grid A* baseline |

@@ -39,6 +39,17 @@ def build_kpi_block(summary_path: Path = SUMMARY) -> str:
                 f"<={_localization_max_particles(summary_path)} particles across 10 wide-prior runs |"
             ),
             (
+                "| L3 EKF-SLAM | <0.20 m pose error; <0.30 m landmark error | "
+                f"{benchmark['slam_mean_pose_error_m']:.3f} m mean pose; "
+                f"{benchmark['slam_mean_landmark_error_m']:.3f} m mean landmarks; "
+                f"{benchmark['slam_mean_landmarks']:.0f} landmarks |"
+            ),
+            (
+                "| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | "
+                f"{benchmark['planner_mean_wall_time_ms']['hybrid_astar']:.1f} ms mean; "
+                f"{benchmark['planner_mean_steering_reduction_percent']:.1f}% steering reduction |"
+            ),
+            (
                 "| L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | "
                 f"{benchmark['scheduler_max_optimality_gap_percent']:.3f}% gap; "
                 f"{_budget_status(benchmark['scheduler_max_wall_time_ms'], 800.0)} unconstrained; "

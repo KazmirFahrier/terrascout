@@ -19,7 +19,8 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 - Constant-velocity Kalman tracking for moving worker detections.
 - KLD-adaptive particle-filter localization with coarse-to-fine lidar scan matching from a +/-5 m, +/-30 degree pose prior.
 - Online Gaussian tree-landmark mapping from local range/bearing detections.
-- Compact EKF-SLAM back end with state expansion, covariance propagation, and range/bearing updates.
+- Lidar tree-trunk detector with scan clustering and deterministic RANSAC circle fitting.
+- Compact EKF-SLAM back end with state expansion, covariance propagation, Mahalanobis-gated association, and range/bearing updates.
 - Grid A* path planning over inflated tree and worker obstacles.
 - Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives and an analytic bounded-curvature connector.
 - Resource-aware inspection scheduler over row priority, travel cost, battery, and daylight budgets.
@@ -91,6 +92,8 @@ Layer KPI snapshot from the current reproducible benchmark suite:
 | --- | --- | ---: |
 | L1 Kalman tracker | <0.20 m 1-second prediction error; >=95% association | 0.037 m mean; 100% association across 100 scenes |
 | L2 particle filter | <0.15 m p95 pose error; <=3,000 particles | 0.029 m p95; <=169 particles across 10 wide-prior runs |
+| L3 EKF-SLAM | <0.20 m pose error; <0.30 m landmark error | 0.032 m mean pose; 0.070 m mean landmarks; 160 landmarks |
+| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | 28.5 ms mean; 86.6% steering reduction |
 | L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | 0.000% gap; budget met unconstrained; budget met resource-aware |
 | 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | 10/10 goals; 0 collisions; 0.201 m mean pose; budget met wall time |
 | Default mission | 100% inspection success; no collisions | 100% success; 0 collisions |
@@ -110,7 +113,7 @@ Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers a
 
 Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* stayed under ~50 ms per plan while returning sparse heading-aware pose paths with >80% lower steering effort.
 
-SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark runs 5-minute traversals across ten 12x30 orchard layouts, observes up to 160 tree landmarks per layout, and reports final pose plus landmark-map error against ground truth.
+SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark runs 5-minute traversals across ten 12x30 orchard layouts, observes up to 160 tree landmarks per layout, and reports final pose plus landmark-map error against ground truth. The scan-space tree-trunk detector lives in `terrascout/mapping/trunks.py` and is covered by unit tests against synthetic circles and full orchard lidar scans.
 
 End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The current suite completes all priority goals with zero collisions, 0.201 m mean pose error, and a 12.00 s max single-mission wall time.
 
@@ -135,9 +138,11 @@ same simulator, estimators, planners, and mission runner used by the tests.
 ```mermaid
 flowchart LR
   world["Orchard world<br/>trees, rows, workers"] --> sensors["Sensor frame<br/>lidar, IMU, encoders"]
+  sensors --> trunks["Trunk detector<br/>clustering + RANSAC"]
   sensors --> tracker["L1 Kalman tracker<br/>worker predictions"]
   sensors --> localizer["L2 MCL<br/>global pose belief"]
-  sensors --> slam["L3 EKF-SLAM<br/>pose + tree map"]
+  trunks --> slam["L3 EKF-SLAM<br/>pose + tree map"]
+  trunks --> localizer
   tracker --> planner["L4 planner<br/>grid A* / Hybrid A*"]
   slam --> planner
   localizer --> runner["Mission runner<br/>pose-source switch"]
@@ -159,7 +164,7 @@ terrascout/
   control/    PID drive controller
   tracking/   Kalman worker tracker
   localize/   particle-filter localization
-  mapping/    online mapper and compact EKF-SLAM
+  mapping/    trunk detector, online mapper, and compact EKF-SLAM
   plan/       grid A* and Hybrid A* planners
   scheduler/  value-iteration inspection scheduler
   runner/     end-to-end mission loop
@@ -170,14 +175,15 @@ Runtime flow:
 
 1. The world emits noisy lidar-style detections plus synchronized lidar scan, IMU, and encoder frames.
 2. The Kalman tracker updates worker tracks and predicts near-future positions.
-3. The KLD-adaptive particle filter estimates rover pose from local tree observations.
-4. The landmark mapper accumulates a tree map from range/bearing detections.
-5. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
-6. The planner builds an inflated occupancy grid from trees and predicted workers.
-7. The PID controller proposes wheel commands from truth, particle-filter, or EKF-SLAM pose.
-8. The battery model consumes energy from motion/idle time and records recharge-station contact.
-9. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
-10. The mission runner records inspection, collision, safety, battery, mapping, EKF-SLAM, localization, path-length, and timing metrics.
+3. The scan clusterer and RANSAC circle fitter produce tree-trunk range/bearing detections.
+4. The KLD-adaptive particle filter estimates rover pose from local tree observations.
+5. The landmark mapper accumulates a tree map from range/bearing detections.
+6. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
+7. The planner builds an inflated occupancy grid from trees and predicted workers.
+8. The PID controller proposes wheel commands from truth, particle-filter, or EKF-SLAM pose.
+9. The battery model consumes energy from motion/idle time and records recharge-station contact.
+10. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
+11. The mission runner records inspection, collision, safety, battery, mapping, EKF-SLAM, localization, path-length, and timing metrics.
 
 Per-layer derivation notes live in [docs/design](docs/design/README.md). They cover the motion
 models, measurement models, update equations, pseudocode, acceptance benchmarks, and references
