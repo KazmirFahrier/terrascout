@@ -1,0 +1,1254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TerraScout — A modular autonomy stack for crop-inspection rovers</title>
+<meta name="description" content="A six-layer Python autonomy stack for a simulated GPS-degraded crop-inspection rover. PID, Kalman, MCL, EKF-SLAM, Hybrid A*, and MDP — built end-to-end by Kazmir Fahrier." />
+<meta name="author" content="Kazmir Fahrier" />
+<meta property="og:title" content="TerraScout — Autonomy stack for a crop-inspection rover" />
+<meta property="og:description" content="Six layers, end-to-end, beating every acceptance target. PID → Kalman → MCL → EKF-SLAM → Hybrid A* → MDP." />
+<meta property="og:type" content="website" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --bg:        #0c1310;
+    --bg-elev:   #131d18;
+    --bg-card:   #16221c;
+    --ink:       #ece3d2;
+    --ink-strong:#fbf6e9;
+    --ink-dim:   #8c8a78;
+    --ink-faint: #525246;
+    --amber:     #e8a33d;
+    --amber-soft:#f1c47b;
+    --sage:      #7bb89c;
+    --rose:      #d97e6a;
+    --line:      #283128;
+    --line-soft: #1d2620;
+    --grid:      rgba(123, 184, 156, 0.06);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Newsreader', Georgia, serif;
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232, 163, 61, 0.08), transparent 60%),
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: auto, 48px 48px, 48px 48px;
+    background-position: 0 0, 0 0, 0 0;
+  }
+
+  /* paper grain overlay */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.06;
+    z-index: 1;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.93  0 0 0 0 0.89  0 0 0 0 0.82  0 0 0 0.6 0'/></filter><rect width='200' height='200' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay;
+  }
+
+  ::selection { background: var(--amber); color: var(--bg); }
+
+  a { color: var(--amber-soft); text-decoration: none; border-bottom: 1px solid rgba(241,196,123,0.3); transition: color .2s, border-color .2s; }
+  a:hover { color: var(--amber); border-bottom-color: var(--amber); }
+
+  /* layout */
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; position: relative; z-index: 2; }
+  @media (max-width: 720px) { .wrap { padding: 0 20px; } }
+
+  /* top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    background: rgba(12, 19, 16, 0.78);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .topbar-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+    max-width: 1180px; margin: 0 auto;
+  }
+  @media (max-width: 720px) { .topbar-inner { padding: 12px 20px; } }
+  .brand {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--ink-strong);
+    text-transform: uppercase;
+    border: none;
+  }
+  .brand .dot { color: var(--amber); }
+  .navlinks { display: flex; gap: 22px; font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .navlinks a { color: var(--ink-dim); border: none; }
+  .navlinks a:hover { color: var(--ink-strong); }
+  @media (max-width: 720px) { .navlinks { display: none; } }
+
+  /* hero */
+  .hero {
+    padding: 80px 0 60px;
+    position: relative;
+  }
+  @media (max-width: 720px) { .hero { padding: 48px 0 40px; } }
+
+  .eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--amber);
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .eyebrow::before {
+    content: ""; width: 28px; height: 1px; background: var(--amber);
+    display: inline-block;
+  }
+  .blink {
+    display: inline-block; width: 8px; height: 8px;
+    background: var(--amber); border-radius: 50%;
+    animation: pulse 1.6s ease-in-out infinite;
+    box-shadow: 0 0 12px var(--amber);
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  h1.title {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(64px, 13vw, 180px);
+    line-height: 0.92;
+    letter-spacing: -0.02em;
+    margin: 24px 0 20px;
+    color: var(--ink-strong);
+  }
+  h1.title em {
+    font-style: italic;
+    color: var(--amber);
+  }
+
+  .lede {
+    font-family: 'Newsreader', serif;
+    font-size: clamp(20px, 2.2vw, 26px);
+    line-height: 1.4;
+    max-width: 720px;
+    color: var(--ink);
+    margin: 32px 0 0;
+  }
+  .lede em { font-style: italic; color: var(--amber-soft); }
+
+  .meta-row {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  @media (max-width: 720px) { .meta-row { grid-template-columns: repeat(2, 1fr); } }
+  .meta-cell {
+    padding: 16px 18px 18px;
+    border-right: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .meta-cell:last-child { border-right: none; }
+  @media (max-width: 720px) {
+    .meta-cell:nth-child(2) { border-right: none; }
+    .meta-cell:nth-child(1), .meta-cell:nth-child(2) { border-bottom: 1px solid var(--line); }
+  }
+  .meta-label {
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 6px;
+  }
+  .meta-value {
+    font-size: 14px; color: var(--ink-strong); font-weight: 500;
+  }
+  .meta-value .ok { color: var(--sage); }
+
+  .hero-cta {
+    margin-top: 44px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+  }
+  .btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px; letter-spacing: 0.06em;
+    padding: 14px 22px;
+    border: 1px solid var(--ink-strong);
+    color: var(--ink-strong);
+    background: transparent;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all .2s ease;
+    display: inline-flex; align-items: center; gap: 10px;
+  }
+  .btn:hover {
+    background: var(--ink-strong); color: var(--bg);
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--amber);
+  }
+  .btn.primary {
+    background: var(--amber); border-color: var(--amber); color: var(--bg);
+  }
+  .btn.primary:hover {
+    background: var(--amber-soft); border-color: var(--amber-soft);
+    box-shadow: 4px 4px 0 var(--ink-strong);
+  }
+  .btn .arrow { transition: transform .2s; }
+  .btn:hover .arrow { transform: translateX(3px); }
+
+  /* hero illustration */
+  .hero-vis {
+    margin-top: 64px;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    padding: 24px 28px 16px;
+    position: relative;
+  }
+  .vis-header {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 14px;
+  }
+  .vis-header .live { color: var(--sage); display: flex; align-items: center; gap: 8px; }
+  .vis-header .live::before {
+    content: ""; width: 6px; height: 6px; background: var(--sage); border-radius: 50%;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+
+  /* SECTIONS */
+  section { padding: 110px 0; position: relative; }
+  @media (max-width: 720px) { section { padding: 72px 0; } }
+
+  .section-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 12px;
+  }
+
+  h2.section-title {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(40px, 6vw, 72px);
+    line-height: 1.0;
+    letter-spacing: -0.015em;
+    margin: 0 0 24px;
+    color: var(--ink-strong);
+    max-width: 880px;
+  }
+  h2.section-title em { font-style: italic; color: var(--amber); }
+
+  .section-intro {
+    font-size: 19px;
+    max-width: 680px;
+    color: var(--ink);
+    margin-top: 0;
+  }
+
+  /* Architecture */
+  .arch {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+    border: 1px solid var(--line);
+    background: var(--bg-elev);
+  }
+  .layer {
+    display: grid;
+    grid-template-columns: 90px 1fr 280px 180px;
+    align-items: stretch;
+    border-bottom: 1px solid var(--line);
+    transition: background .25s ease;
+  }
+  .layer:last-child { border-bottom: none; }
+  .layer:hover { background: var(--bg-card); }
+  .layer:hover .layer-id { color: var(--amber); }
+  .layer:hover .layer-bar { background: var(--amber); }
+
+  .layer-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--ink-dim);
+    padding: 28px 0 28px 24px;
+    border-right: 1px solid var(--line-soft);
+    transition: color .25s ease;
+    display: flex; align-items: center;
+  }
+  .layer-body {
+    padding: 26px 28px 28px;
+    border-right: 1px solid var(--line-soft);
+  }
+  .layer-name {
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px;
+    line-height: 1.1;
+    color: var(--ink-strong);
+    margin: 0 0 6px;
+  }
+  .layer-tech {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; letter-spacing: 0.04em;
+    color: var(--ink-dim);
+    margin-bottom: 10px;
+  }
+  .layer-desc {
+    font-size: 15px;
+    color: var(--ink);
+    line-height: 1.5;
+    margin: 0;
+  }
+  .layer-result {
+    padding: 26px 24px;
+    border-right: 1px solid var(--line-soft);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; line-height: 1.6;
+    color: var(--ink);
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .layer-result .target { color: var(--ink-faint); text-decoration: line-through; font-size: 11px; }
+  .layer-result .actual { color: var(--sage); font-size: 13px; font-weight: 500; }
+  .layer-margin {
+    padding: 26px 20px;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 4px;
+    background: linear-gradient(135deg, transparent 0%, rgba(232, 163, 61, 0.04) 100%);
+  }
+  .layer-margin .big {
+    font-family: 'Instrument Serif', serif;
+    font-size: 36px; line-height: 1;
+    color: var(--amber);
+    font-style: italic;
+  }
+  .layer-margin .small {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  @media (max-width: 900px) {
+    .layer { grid-template-columns: 64px 1fr; }
+    .layer-result, .layer-margin { grid-column: 1 / -1; border-right: none; border-top: 1px solid var(--line-soft); padding: 16px 24px; }
+    .layer-margin { background: rgba(232, 163, 61, 0.05); flex-direction: row; justify-content: flex-start; gap: 12px; }
+    .layer-margin .big { font-size: 24px; }
+    .layer-id { padding: 24px 0 0 20px; align-items: flex-start; }
+    .layer-body { padding: 20px 20px 24px; border-right: none; }
+  }
+
+  /* KPI grid */
+  .kpis {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border: 1px solid var(--line);
+  }
+  @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .kpis { grid-template-columns: 1fr; } }
+  .kpi {
+    padding: 32px 28px 36px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-elev);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi:nth-child(3n) { border-right: none; }
+  @media (max-width: 900px) {
+    .kpi { border-right: 1px solid var(--line); }
+    .kpi:nth-child(3n) { border-right: 1px solid var(--line); }
+    .kpi:nth-child(2n) { border-right: none; }
+  }
+  @media (max-width: 600px) {
+    .kpi { border-right: none !important; }
+  }
+  .kpi-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 18px;
+  }
+  .kpi-value {
+    font-family: 'Instrument Serif', serif;
+    font-size: 64px;
+    line-height: 0.95;
+    color: var(--amber);
+    font-style: italic;
+    letter-spacing: -0.02em;
+  }
+  .kpi-value .unit {
+    font-size: 22px;
+    color: var(--ink);
+    font-style: normal;
+    margin-left: 4px;
+  }
+  .kpi-target {
+    margin-top: 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+  }
+  .kpi-target .vs { color: var(--ink-dim); }
+  .kpi-target .tgt { text-decoration: line-through; }
+
+  /* Demo section */
+  .demo {
+    margin-top: 56px;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    padding: 24px;
+    position: relative;
+  }
+  .demo-frame {
+    border: 1px solid var(--line);
+    background: var(--bg);
+    overflow: hidden;
+    position: relative;
+  }
+  .demo-frame img {
+    display: block;
+    width: 100%; height: auto;
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+  .demo-caption {
+    margin-top: 18px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
+    flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.05em;
+  }
+  .demo-caption .right { text-align: right; }
+
+  /* Milestones */
+  .milestones {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    border: 1px solid var(--line);
+  }
+  @media (max-width: 900px) { .milestones { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .milestones { grid-template-columns: 1fr; } }
+  .ms {
+    padding: 24px 24px 28px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    background: var(--bg-elev);
+    transition: background .2s ease;
+  }
+  .ms:nth-child(3n) { border-right: none; }
+  @media (max-width: 900px) {
+    .ms { border-right: 1px solid var(--line); }
+    .ms:nth-child(3n) { border-right: 1px solid var(--line); }
+    .ms:nth-child(2n) { border-right: none; }
+  }
+  @media (max-width: 600px) {
+    .ms { border-right: none !important; }
+  }
+  .ms:hover { background: var(--bg-card); }
+  .ms-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--amber);
+    margin-bottom: 10px;
+  }
+  .ms-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 24px;
+    line-height: 1.15;
+    color: var(--ink-strong);
+    margin: 0 0 14px;
+  }
+  .ms-thumb {
+    width: 100%;
+    aspect-ratio: 16/10;
+    background: var(--bg);
+    border: 1px solid var(--line-soft);
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .ms-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .ms-link {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    border: none;
+  }
+  .ms-link:hover { color: var(--amber); }
+  .ms-link::after { content: " →"; }
+
+  /* Engineering */
+  .eng {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: start;
+  }
+  @media (max-width: 800px) { .eng { grid-template-columns: 1fr; } }
+  .eng-list {
+    list-style: none;
+    padding: 0; margin: 0;
+    border-top: 1px solid var(--line);
+  }
+  .eng-list li {
+    display: grid;
+    grid-template-columns: 24px 140px 1fr;
+    align-items: baseline;
+    gap: 16px;
+    padding: 18px 0;
+    border-bottom: 1px solid var(--line);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+  }
+  .eng-list .check { color: var(--sage); }
+  .eng-list .lbl { color: var(--ink-dim); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+  .eng-list .val { color: var(--ink); }
+  .eng-list .val strong { color: var(--ink-strong); font-weight: 500; }
+
+  .eng-quote {
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    padding: 32px 32px 36px;
+    font-family: 'Instrument Serif', serif;
+    font-size: 28px;
+    line-height: 1.25;
+    color: var(--ink);
+    font-style: italic;
+    position: relative;
+  }
+  .eng-quote::before {
+    content: "“";
+    position: absolute; top: -8px; left: 18px;
+    font-family: 'Instrument Serif', serif;
+    font-size: 110px;
+    color: var(--amber);
+    line-height: 1;
+  }
+  .eng-quote .who {
+    margin-top: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--ink-dim);
+    font-style: normal;
+  }
+
+  /* Resume */
+  .resume {
+    margin-top: 56px;
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    padding: 36px 40px 40px;
+  }
+  @media (max-width: 600px) { .resume { padding: 28px 22px; } }
+  .resume-headline {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(22px, 2.6vw, 30px);
+    line-height: 1.35;
+    color: var(--ink-strong);
+    margin: 0 0 24px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+  .resume-headline em { font-style: italic; color: var(--amber); }
+  .resume-bullets {
+    list-style: none;
+    padding: 0; margin: 0;
+  }
+  .resume-bullets li {
+    padding: 14px 0 14px 24px;
+    border-bottom: 1px solid var(--line-soft);
+    font-size: 15.5px;
+    line-height: 1.55;
+    color: var(--ink);
+    position: relative;
+  }
+  .resume-bullets li:last-child { border-bottom: none; }
+  .resume-bullets li::before {
+    content: "▸";
+    position: absolute; left: 0; top: 14px;
+    color: var(--amber);
+    font-size: 14px;
+  }
+  .resume-bullets strong { color: var(--ink-strong); font-weight: 500; }
+  .resume-bullets .num {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--amber-soft);
+    font-weight: 500;
+    background: rgba(232, 163, 61, 0.08);
+    padding: 1px 6px;
+    border-radius: 2px;
+    font-size: 14px;
+  }
+  .copy-row {
+    margin-top: 22px;
+    display: flex; gap: 12px;
+  }
+  .copy-btn {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+    background: transparent;
+    color: var(--ink-dim);
+    border: 1px solid var(--line);
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .copy-btn:hover { color: var(--ink-strong); border-color: var(--ink-dim); }
+  .copy-btn.done { color: var(--sage); border-color: var(--sage); }
+
+  /* About / contact */
+  .about {
+    margin-top: 56px;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 56px;
+    align-items: start;
+  }
+  @media (max-width: 800px) { .about { grid-template-columns: 1fr; gap: 32px; } }
+  .about-text p {
+    font-size: 19px;
+    line-height: 1.6;
+    color: var(--ink);
+    margin: 0 0 18px;
+  }
+  .about-text p:first-child::first-letter {
+    font-family: 'Instrument Serif', serif;
+    font-size: 64px;
+    line-height: 0.9;
+    float: left;
+    margin: 4px 8px 0 0;
+    color: var(--amber);
+    font-style: italic;
+  }
+  .contact-card {
+    background: var(--bg-elev);
+    border: 1px solid var(--line);
+    padding: 28px 28px 32px;
+  }
+  .contact-name {
+    font-family: 'Instrument Serif', serif;
+    font-size: 36px;
+    color: var(--ink-strong);
+    margin: 0 0 6px;
+  }
+  .contact-role {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 24px;
+  }
+  .contact-list {
+    list-style: none; padding: 0; margin: 0;
+    border-top: 1px solid var(--line);
+  }
+  .contact-list li {
+    border-bottom: 1px solid var(--line);
+    padding: 14px 0;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .contact-list li span { color: var(--ink-dim); font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; }
+  .contact-list li a { border: none; color: var(--ink); font-weight: 500; }
+  .contact-list li a:hover { color: var(--amber); }
+
+  /* footer */
+  footer {
+    margin-top: 80px;
+    border-top: 1px solid var(--line);
+    padding: 32px 0 48px;
+  }
+  .foot-inner {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    gap: 24px; flex-wrap: wrap;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; letter-spacing: 0.08em;
+    color: var(--ink-dim);
+  }
+  .foot-inner .eof {
+    color: var(--amber);
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+
+  /* Reveal animations */
+  .reveal {
+    opacity: 0;
+    transform: translateY(24px);
+    transition: opacity .9s ease, transform .9s cubic-bezier(.2,.7,.25,1);
+  }
+  .reveal.in { opacity: 1; transform: translateY(0); }
+
+  /* SVG illustration */
+  .orchard-svg { display: block; width: 100%; height: auto; }
+  .rover-path { stroke-dasharray: 4 6; animation: dash 18s linear infinite; }
+  @keyframes dash { to { stroke-dashoffset: -200; } }
+
+  .rover-marker {
+    animation: rover-move 22s cubic-bezier(.42,.0,.58,1) infinite;
+  }
+  @keyframes rover-move {
+    0%   { transform: translate(40px, 240px); }
+    20%  { transform: translate(640px, 240px); }
+    25%  { transform: translate(700px, 200px); }
+    45%  { transform: translate(40px, 160px); }
+    50%  { transform: translate(20px, 120px); }
+    70%  { transform: translate(640px, 120px); }
+    75%  { transform: translate(700px, 80px); }
+    95%  { transform: translate(40px, 80px); }
+    100% { transform: translate(40px, 240px); }
+  }
+
+  .scan-arc { animation: scan-rotate 4s linear infinite; transform-origin: center; transform-box: fill-box; }
+  @keyframes scan-rotate {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-inner">
+    <a href="#" class="brand">TerraScout <span class="dot">●</span> v1.0</a>
+    <nav class="navlinks">
+      <a href="#system">System</a>
+      <a href="#performance">Performance</a>
+      <a href="#mission">Mission</a>
+      <a href="#about">About</a>
+      <a href="https://github.com/KazmirFahrier/terrascout" target="_blank" rel="noopener">GitHub ↗</a>
+    </nav>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="eyebrow">
+      <span class="blink"></span>
+      Telemetry &nbsp; · &nbsp; Mission Logged &nbsp; · &nbsp; 2026
+    </div>
+
+    <h1 class="title">Terra<em>Scout</em></h1>
+
+    <p class="lede">
+      A six-layer Python autonomy stack for a simulated crop-inspection rover
+      operating in <em>GPS-degraded orchards</em>. PID, Kalman, particle filter,
+      EKF-SLAM, Hybrid&nbsp;A*, and an MDP scheduler — built end-to-end, every
+      acceptance target beaten.
+    </p>
+
+    <div class="meta-row">
+      <div class="meta-cell">
+        <div class="meta-label">Mission Success</div>
+        <div class="meta-value"><span class="ok">10 / 10</span> priority rows</div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-label">Mean Pose Error</div>
+        <div class="meta-value">0.201&thinsp;m <span class="ok">·</span> tgt&nbsp;0.25</div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-label">Wall Time (30 rows)</div>
+        <div class="meta-value">12&thinsp;s <span class="ok">·</span> tgt&nbsp;60</div>
+      </div>
+      <div class="meta-cell">
+        <div class="meta-label">Coverage</div>
+        <div class="meta-value">90%+ <span class="ok">✓</span></div>
+      </div>
+    </div>
+
+    <div class="hero-cta">
+      <a class="btn primary" href="https://github.com/KazmirFahrier/terrascout" target="_blank" rel="noopener">
+        View Repository <span class="arrow">→</span>
+      </a>
+      <a class="btn" href="#mission">Watch Mission</a>
+      <a class="btn" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/PROJECT_ONE_PAGER.pdf" target="_blank" rel="noopener">One-Pager (PDF)</a>
+    </div>
+
+    <!-- Hero illustration -->
+    <div class="hero-vis">
+      <div class="vis-header">
+        <span>NODE_01 / orchard_block_A — sim trace</span>
+        <span class="live">LIVE</span>
+      </div>
+      <svg class="orchard-svg" viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Schematic of the orchard rover mission">
+        <defs>
+          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1d2620" stroke-width="0.6"/>
+          </pattern>
+          <radialGradient id="scanGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#e8a33d" stop-opacity="0.45"/>
+            <stop offset="60%" stop-color="#e8a33d" stop-opacity="0.07"/>
+            <stop offset="100%" stop-color="#e8a33d" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <rect width="720" height="280" fill="url(#grid)"/>
+
+        <!-- orchard rows: trees -->
+        <g fill="#7bb89c" opacity="0.6">
+          <!-- row 1 -->
+          <g>
+            <circle cx="80" cy="60" r="6"/><circle cx="160" cy="60" r="6"/>
+            <circle cx="240" cy="60" r="6"/><circle cx="320" cy="60" r="6"/>
+            <circle cx="400" cy="60" r="6"/><circle cx="480" cy="60" r="6"/>
+            <circle cx="560" cy="60" r="6"/><circle cx="640" cy="60" r="6"/>
+          </g>
+          <!-- row 2 -->
+          <g opacity="0.85">
+            <circle cx="80" cy="100" r="6"/><circle cx="160" cy="100" r="6"/>
+            <circle cx="240" cy="100" r="6"/><circle cx="320" cy="100" r="6"/>
+            <circle cx="400" cy="100" r="6"/><circle cx="480" cy="100" r="6"/>
+            <circle cx="560" cy="100" r="6"/><circle cx="640" cy="100" r="6"/>
+          </g>
+          <!-- row 3 -->
+          <g>
+            <circle cx="80" cy="180" r="6"/><circle cx="160" cy="180" r="6"/>
+            <circle cx="240" cy="180" r="6"/><circle cx="320" cy="180" r="6"/>
+            <circle cx="400" cy="180" r="6"/><circle cx="480" cy="180" r="6"/>
+            <circle cx="560" cy="180" r="6"/><circle cx="640" cy="180" r="6"/>
+          </g>
+          <!-- row 4 -->
+          <g opacity="0.85">
+            <circle cx="80" cy="220" r="6"/><circle cx="160" cy="220" r="6"/>
+            <circle cx="240" cy="220" r="6"/><circle cx="320" cy="220" r="6"/>
+            <circle cx="400" cy="220" r="6"/><circle cx="480" cy="220" r="6"/>
+            <circle cx="560" cy="220" r="6"/><circle cx="640" cy="220" r="6"/>
+          </g>
+        </g>
+
+        <!-- planned path -->
+        <path class="rover-path" d="M 40 240 L 680 240 Q 700 240 700 220 L 700 180 Q 700 160 680 160 L 40 160 Q 20 160 20 140 L 20 120 Q 20 100 40 100 L 680 100 Q 700 100 700 80 L 40 80"
+              fill="none" stroke="#e8a33d" stroke-width="1.2" opacity="0.55"/>
+
+        <!-- worker -->
+        <g transform="translate(360, 140)">
+          <circle r="4" fill="#d97e6a"/>
+          <circle r="14" fill="none" stroke="#d97e6a" stroke-width="0.6" opacity="0.6"/>
+        </g>
+
+        <!-- rover -->
+        <g class="rover-marker">
+          <circle r="32" fill="url(#scanGrad)"/>
+          <g class="scan-arc">
+            <path d="M 0 0 L 28 -16 A 32 32 0 0 1 28 16 Z" fill="#e8a33d" opacity="0.35"/>
+          </g>
+          <rect x="-7" y="-5" width="14" height="10" fill="#ece3d2" rx="1"/>
+          <rect x="-9" y="-6" width="2" height="12" fill="#8c8a78"/>
+          <rect x="7"  y="-6" width="2" height="12" fill="#8c8a78"/>
+        </g>
+
+        <!-- legend -->
+        <g font-family="JetBrains Mono, monospace" font-size="9" fill="#8c8a78" letter-spacing="1">
+          <text x="20" y="20">PLANNED PATH ─ ─</text>
+          <text x="200" y="20">● TREE</text>
+          <text x="270" y="20" fill="#d97e6a">● WORKER</text>
+          <text x="350" y="20" fill="#e8a33d">◉ ROVER + LIDAR</text>
+        </g>
+      </svg>
+    </div>
+  </header>
+
+  <!-- THE SYSTEM -->
+  <section id="system" class="reveal">
+    <div class="section-num">§ 01 — System Architecture</div>
+    <h2 class="section-title">Six layers, <em>narrow interfaces</em>.</h2>
+    <p class="section-intro">
+      Each layer is independently testable but composes into one end-to-end mission —
+      from cold boot at the field edge, through localization, planning, and inspection,
+      to a complete pass over a target orchard block.
+    </p>
+
+    <div class="arch">
+      <div class="layer">
+        <div class="layer-id">L0</div>
+        <div class="layer-body">
+          <h3 class="layer-name">Drive Controller</h3>
+          <div class="layer-tech">Twin-loop PID — linear velocity + heading</div>
+          <p class="layer-desc">Tracks kinematic setpoints by closing the loop on left/right wheel velocities. The inner loop of the entire stack.</p>
+        </div>
+        <div class="layer-result">
+          <span class="target">10 randomized slip/friction runs</span>
+          <span class="actual">benchmark suite green</span>
+        </div>
+        <div class="layer-margin">
+          <span class="big">PID</span>
+          <span class="small">closed-loop</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-id">L1</div>
+        <div class="layer-body">
+          <h3 class="layer-name">Worker Tracker</h3>
+          <div class="layer-tech">Constant-velocity Kalman filter</div>
+          <p class="layer-desc">Tracks moving agents detected as lidar clusters; predicts each track 1 second ahead so the planner can inflate cost.</p>
+        </div>
+        <div class="layer-result">
+          <span class="target">tgt &lt; 0.20 m, ≥ 95% assoc</span>
+          <span class="actual">→ 0.037 m, 100% assoc</span>
+        </div>
+        <div class="layer-margin">
+          <span class="big">5.4×</span>
+          <span class="small">vs target</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-id">L2</div>
+        <div class="layer-body">
+          <h3 class="layer-name">Global Localizer</h3>
+          <div class="layer-tech">Monte-Carlo localization — KLD adaptive resampling</div>
+          <p class="layer-desc">Recovers rover pose at startup or after GNSS dropout using lidar scan matching against a coarse prior orchard map.</p>
+        </div>
+        <div class="layer-result">
+          <span class="target">tgt &lt; 0.15 m p95, ≤ 3000 particles</span>
+          <span class="actual">→ 0.029 m p95, ≤ 169 particles</span>
+        </div>
+        <div class="layer-margin">
+          <span class="big">5.2×</span>
+          <span class="small">vs target</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-id">L3</div>
+        <div class="layer-body">
+          <h3 class="layer-name">Pose-Graph SLAM</h3>
+          <div class="layer-tech">EKF-SLAM with tree-trunk landmarks · RANSAC + Mahalanobis gating</div>
+          <p class="layer-desc">Continuously fuses odometry and lidar-detected trunks to refine rover pose and the orchard map online.</p>
+        </div>
+        <div class="layer-result">
+          <span class="target">tgt &lt; 0.20 m pose, &lt; 0.30 m landmarks</span>
+          <span class="actual">→ 0.032 m pose, 0.070 m landmarks</span>
+        </div>
+        <div class="layer-margin">
+          <span class="big">6.3×</span>
+          <span class="small">vs target</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-id">L4</div>
+        <div class="layer-body">
+          <h3 class="layer-name">Kinematic Planner</h3>
+          <div class="layer-tech">Hybrid A* on (x, y, θ) lattice + analytic bounded-curvature connector</div>
+          <p class="layer-desc">Plans a kinematically feasible path on the SLAM cost map, inflated by Kalman-predicted worker positions from L1.</p>
+        </div>
+        <div class="layer-result">
+          <span class="target">tgt ≤ 250 ms, ≥ 30% steering reduction</span>
+          <span class="actual">→ 28.5 ms, 86.6% reduction</span>
+        </div>
+        <div class="layer-margin">
+          <span class="big">8.8×</span>
+          <span class="small">vs target</span>
+        </div>
+      </div>
+
+      <div class="layer">
+        <div class="layer-id">L5</div>
+        <div class="layer-body">
+          <h3 class="layer-name">Inspection Scheduler</h3>
+          <div class="layer-tech">Markov decision process — value iteration</div>
+          <p class="layer-desc">Chooses which orchard row to inspect next under battery state-of-charge, daylight, and row-priority constraints.</p>
+        </div>
+        <div class="layer-result">
+          <span class="target">tgt ≤ 5% oracle gap, &lt; 800 ms</span>
+          <span class="actual">→ 0.000% gap, well under budget</span>
+        </div>
+        <div class="layer-margin">
+          <span class="big">∞</span>
+          <span class="small">oracle-equiv.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PERFORMANCE -->
+  <section id="performance" class="reveal">
+    <div class="section-num">§ 02 — Headline Performance</div>
+    <h2 class="section-title">Measured numbers, <em>not adjectives</em>.</h2>
+    <p class="section-intro">
+      Every layer ships with a benchmark script that emits a CSV; CI re-runs the
+      suite on every push to <code style="font-family:'JetBrains Mono',monospace; color:var(--amber-soft); font-size:14px;">main</code>.
+      These are the headline numbers from the current run.
+    </p>
+
+    <div class="kpis">
+      <div class="kpi">
+        <div class="kpi-label">L1 · Worker prediction error (1&thinsp;s ahead)</div>
+        <div class="kpi-value">0.037<span class="unit">m</span></div>
+        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">&lt; 0.20 m</span> · 100 scenes</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">L2 · MCL pose error, p95</div>
+        <div class="kpi-value">0.029<span class="unit">m</span></div>
+        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">&lt; 0.15 m</span> · ≤ 169 particles</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">L3 · EKF-SLAM mean pose error</div>
+        <div class="kpi-value">0.032<span class="unit">m</span></div>
+        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">&lt; 0.20 m</span> · 10 layouts</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">L4 · Hybrid A* mean solve time</div>
+        <div class="kpi-value">28.5<span class="unit">ms</span></div>
+        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">≤ 250 ms</span> · 86.6% steering Δ</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">L5 · MDP optimality gap vs oracle</div>
+        <div class="kpi-value">0.00<span class="unit">%</span></div>
+        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">≤ 5%</span> · 50 layouts</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">End-to-end · 30-row priority pass</div>
+        <div class="kpi-value">10<span class="unit">/10</span></div>
+        <div class="kpi-target"><span class="vs">target</span> <span class="tgt">≥ 9/10</span> · 0 collisions, 12&thinsp;s wall</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MISSION -->
+  <section id="mission" class="reveal">
+    <div class="section-num">§ 03 — End-to-End Mission</div>
+    <h2 class="section-title">A full pass, <em>autonomously</em>.</h2>
+    <p class="section-intro">
+      Cold boot at the field edge. Localize. Pick the next priority row.
+      Plan over the SLAM cost map, inflated by predicted worker positions.
+      Drive. Inspect. Repeat — within battery and daylight budgets.
+    </p>
+
+    <div class="demo">
+      <div class="vis-header" style="margin-bottom:14px;">
+        <span>mission_trace.gif &nbsp;·&nbsp; seed = 7 &nbsp;·&nbsp; 8 rows × 14 trees</span>
+        <span class="live">REPRODUCIBLE</span>
+      </div>
+      <div class="demo-frame">
+        <img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/mission_trace.gif"
+             alt="Animated trace of the TerraScout rover completing a full orchard inspection pass"
+             loading="lazy" />
+      </div>
+      <div class="demo-caption">
+        <div>$&nbsp; python -m terrascout.runner.reproduce --skip-gif</div>
+        <div class="right">writes traces, PNGs, metric CSVs, benchmark CSVs, and reproduce_summary.json</div>
+      </div>
+    </div>
+
+    <!-- Milestones -->
+    <h3 style="font-family:'Instrument Serif',serif; font-size:32px; font-weight:400; margin:80px 0 12px; color:var(--ink-strong); letter-spacing:-0.01em;">
+      Six milestones, <em style="color:var(--amber); font-style:italic;">six demos</em>.
+    </h3>
+    <p style="max-width:680px; color:var(--ink); font-size:17px;">
+      Twelve weeks, six two-week milestones, each gated on green CI before the next began.
+    </p>
+
+    <div class="milestones">
+      <div class="ms">
+        <div class="ms-id">M1 · Weeks 1–2</div>
+        <h4 class="ms-title">Simulator + Drive Controller</h4>
+        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m1_control.gif" alt="PID tracking square and figure-eight" loading="lazy"/></div>
+        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m1_control.gif" target="_blank" rel="noopener">PID tracking demo</a>
+      </div>
+      <div class="ms">
+        <div class="ms-id">M2 · Weeks 3–4</div>
+        <h4 class="ms-title">Kalman Worker Tracker</h4>
+        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m2_tracker.gif" alt="Kalman tracker overlay" loading="lazy"/></div>
+        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m2_tracker.gif" target="_blank" rel="noopener">Tracker overlay</a>
+      </div>
+      <div class="ms">
+        <div class="ms-id">M3 · Weeks 5–6</div>
+        <h4 class="ms-title">Monte-Carlo Localizer</h4>
+        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m3_mcl.gif" alt="Particle cloud convergence" loading="lazy"/></div>
+        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m3_mcl.gif" target="_blank" rel="noopener">Particle convergence</a>
+      </div>
+      <div class="ms">
+        <div class="ms-id">M4 · Weeks 7–8</div>
+        <h4 class="ms-title">Pose-Graph EKF-SLAM</h4>
+        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m4_slam_overlay.gif" alt="Estimated trunks vs ground truth" loading="lazy"/></div>
+        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m4_slam_overlay.gif" target="_blank" rel="noopener">Map overlay</a>
+      </div>
+      <div class="ms">
+        <div class="ms-id">M5 · Weeks 9–10</div>
+        <h4 class="ms-title">Hybrid A* Planner</h4>
+        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m5_planner_comparison.gif" alt="Grid A* vs Hybrid A*" loading="lazy"/></div>
+        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m5_planner_comparison.gif" target="_blank" rel="noopener">Path comparison</a>
+      </div>
+      <div class="ms">
+        <div class="ms-id">M6 · Weeks 11–12</div>
+        <h4 class="ms-title">MDP + End-to-End</h4>
+        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m6_final_mission.gif" alt="30-row orchard priority pass" loading="lazy"/></div>
+        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m6_final_mission.gif" target="_blank" rel="noopener">Final mission</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENGINEERING -->
+  <section id="engineering" class="reveal">
+    <div class="section-num">§ 04 — Engineering Practice</div>
+    <h2 class="section-title">Reproducible by <em>one command</em>.</h2>
+
+    <div class="eng">
+      <ul class="eng-list">
+        <li><span class="check">✓</span><span class="lbl">Language</span><span class="val"><strong>Python 3.9+</strong> · 100% Python</span></li>
+        <li><span class="check">✓</span><span class="lbl">Tests</span><span class="val"><strong>pytest + unittest</strong> · per-layer suites</span></li>
+        <li><span class="check">✓</span><span class="lbl">Coverage</span><span class="val"><strong>90%+</strong> line coverage gate</span></li>
+        <li><span class="check">✓</span><span class="lbl">CI</span><span class="val"><strong>GitHub Actions</strong> · ruff · mypy · pytest</span></li>
+        <li><span class="check">✓</span><span class="lbl">Reproducibility</span><span class="val"><strong>Seedable</strong> · scenario JSONs · deterministic CSVs</span></li>
+        <li><span class="check">✓</span><span class="lbl">Docs</span><span class="val"><strong>Per-module derivation PDFs</strong> · one-pager · KPI auto-update</span></li>
+        <li><span class="check">✓</span><span class="lbl">Originality</span><span class="val"><strong>Clean-room</strong> · MIT licensed</span></li>
+      </ul>
+
+      <blockquote class="eng-quote">
+        Numbers — not adjectives — are what make this credible to a hiring manager.
+        Every module ships with a benchmark script that emits a CSV.
+        <div class="who">— project README</div>
+      </blockquote>
+    </div>
+  </section>
+
+  <!-- RESUME-READY -->
+  <section id="resume" class="reveal">
+    <div class="section-num">§ 05 — Recruiter-Ready Summary</div>
+    <h2 class="section-title">Drop straight onto the <em>resume</em>.</h2>
+
+    <div class="resume">
+      <p class="resume-headline" id="headlineLine">
+        TerraScout — Built a six-layer autonomy stack
+        (PID → Kalman → MCL → Pose-Graph EKF-SLAM → Hybrid A* → MDP)
+        for a simulated GPS-degraded crop-inspection rover; <em>completed 10/10 priority rows
+        with 0.201 m mean pose error in 12 s wall-clock</em> across 20 randomized 30-row missions.
+      </p>
+
+      <ul class="resume-bullets" id="bulletsList">
+        <li>Architected and implemented a <strong>six-layer Python autonomy stack</strong> for a simulated differential-drive crop-inspection rover, integrating PID drive control, Kalman-filter worker tracking, particle-filter localization, pose-graph EKF-SLAM, Hybrid A* kinematic planning, and MDP inspection scheduling — all behind clean module APIs.</li>
+        <li>Designed a Kalman-filter tracker for up to 10 simultaneous moving agents from lidar clusters; achieved <span class="num">0.037 m</span> mean 1-second-ahead prediction error and <span class="num">100%</span> data-association accuracy across 100 simulated scenes.</li>
+        <li>Implemented an <strong>adaptive Monte-Carlo localizer</strong> with KLD resampling that converges from a ±5 m / ±30° prior to <span class="num">0.029 m p95</span> pose error using ≤ 169 particles — a 5.2× margin over the 3,000-particle, 0.15 m target.</li>
+        <li>Built a pose-graph <strong>EKF-SLAM</strong> module with Mahalanobis-gated data association on lidar-detected tree trunks; achieved <span class="num">0.032 m</span> drift-corrected pose and <span class="num">0.070 m</span> landmark error after 5-minute traversals across procedurally generated 12×30-row orchards.</li>
+        <li>Developed a <strong>Hybrid A* planner</strong> with bounded-curvature analytic connectors on a SLAM cost map inflated by Kalman-predicted worker positions; cut total steering effort by <span class="num">86.6%</span> vs. baseline grid A* with mean solve time <span class="num">28.5 ms</span>.</li>
+        <li>Solved orchard inspection scheduling as an <strong>MDP via value iteration</strong> over battery-SOC and time-of-day state; computed policy reaches the oracle exactly (<span class="num">0.00%</span> gap) across 50 randomized layouts under battery + daylight constraints.</li>
+        <li>Engineered a reproducible benchmark + CI pipeline (ruff, mypy --strict, pytest, <span class="num">90%+</span> coverage) that auto-publishes KPI tables to the project README on every push to <code style="font-family:'JetBrains Mono',monospace;">main</code>.</li>
+      </ul>
+
+      <div class="copy-row">
+        <button class="copy-btn" id="copyHeadline">Copy headline</button>
+        <button class="copy-btn" id="copyAll">Copy all bullets</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about" class="reveal">
+    <div class="section-num">§ 06 — About</div>
+    <h2 class="section-title">Built by <em>Kazmir Fahrier</em>.</h2>
+
+    <div class="about">
+      <div class="about-text">
+        <p>
+          A self-directed twelve-week capstone designed to demonstrate full-stack autonomy
+          competence for robotics and ML engineering roles. The project pulls from foundational
+          textbook techniques — Probabilistic Robotics (Thrun, Burgard &amp; Fox), Planning
+          Algorithms (LaValle), Feedback Systems (Åström &amp; Murray), Sutton &amp; Barto —
+          and integrates them into one runnable, reproducible, end-to-end stack.
+        </p>
+        <p>
+          Every line is clean-room original code. No course-provided starter, simulator, test
+          fixtures, or assets. The vehicle class (skid-steer ground rover) and domain
+          (precision agriculture / GPS-degraded orchard inspection) were chosen specifically to
+          keep the work independent of any prior coursework.
+        </p>
+        <p>
+          Author background: BSc Electrical &amp; Electronic Engineering (BUET, US-equivalency
+          credentialed), Georgia Tech OMSCS in progress, hands-on AI evaluation work as an AI
+          trainer with deep coverage of analog/digital circuits, control systems, and
+          communications.
+        </p>
+      </div>
+
+      <aside class="contact-card">
+        <div class="contact-name">Kazmir Fahrier</div>
+        <div class="contact-role">Robotics · ML · Hardware/Software</div>
+        <ul class="contact-list">
+          <li><span>GitHub</span><a href="https://github.com/KazmirFahrier" target="_blank" rel="noopener">@KazmirFahrier ↗</a></li>
+          <li><span>LinkedIn</span><a href="https://www.linkedin.com/in/kazmir-fahrier" target="_blank" rel="noopener">/in/kazmir-fahrier ↗</a></li>
+          <li><span>Repository</span><a href="https://github.com/KazmirFahrier/terrascout" target="_blank" rel="noopener">/terrascout ↗</a></li>
+          <li><span>One-Pager</span><a href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/PROJECT_ONE_PAGER.pdf" target="_blank" rel="noopener">PDF ↗</a></li>
+        </ul>
+      </aside>
+    </div>
+  </section>
+
+  <footer>
+    <div class="foot-inner">
+      <div>© 2026 Kazmir Fahrier · MIT License · Clean-room original</div>
+      <div class="eof">— EOF —</div>
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // Reveal-on-scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -60px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Copy buttons
+  function flash(btn, text) {
+    const orig = btn.textContent;
+    btn.textContent = text || 'Copied ✓';
+    btn.classList.add('done');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('done'); }, 1600);
+  }
+  function plainText(node) {
+    return node.innerText.replace(/\s+/g, ' ').trim();
+  }
+  document.getElementById('copyHeadline').addEventListener('click', async () => {
+    const t = plainText(document.getElementById('headlineLine'));
+    try { await navigator.clipboard.writeText(t); flash(event.currentTarget); }
+    catch(e) { flash(event.currentTarget, 'Press ⌘C'); }
+  });
+  document.getElementById('copyAll').addEventListener('click', async (event) => {
+    const items = Array.from(document.querySelectorAll('#bulletsList li'))
+      .map(li => '• ' + plainText(li));
+    const text = plainText(document.getElementById('headlineLine')) + '\n\n' + items.join('\n\n');
+    try { await navigator.clipboard.writeText(text); flash(event.currentTarget); }
+    catch(e) { flash(event.currentTarget, 'Press ⌘C'); }
+  });
+</script>
+
+</body>
+</html>
