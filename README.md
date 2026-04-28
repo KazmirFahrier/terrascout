@@ -59,6 +59,7 @@ python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
 python docs/design/render_design_pdfs.py
 python docs/render_project_one_pager_pdf.py
+python docs/render_milestone_demos.py
 python -m pytest
 ```
 
@@ -105,6 +106,20 @@ SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact 
 End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The current suite completes all priority goals with zero collisions, 0.201 m mean pose error, and a 12.00 s max single-mission wall time.
 
 Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
+
+## Milestone Demos
+
+`python docs/render_milestone_demos.py` regenerates the portfolio demo artifacts below from the
+same simulator, estimators, planners, and mission runner used by the tests.
+
+| Milestone | Demo artifact |
+| --- | --- |
+| M1 Simulator + PID | ![PID square and figure-eight tracking](docs/milestones/m1_control.gif) |
+| M2 Kalman tracker | ![Kalman tracker ground truth and prediction overlay](docs/milestones/m2_tracker.gif) |
+| M3 Monte-Carlo localizer | ![Particle cloud convergence heat map](docs/milestones/m3_mcl.gif) |
+| M4 EKF-SLAM | ![Estimated tree landmarks over ground truth](docs/milestones/m4_slam_overlay.gif) |
+| M5 Hybrid A* planner | ![Grid A* and Hybrid A* path comparison](docs/milestones/m5_planner_comparison.gif) |
+| M6 MDP + end-to-end | ![30-row orchard priority pass](docs/milestones/m6_final_mission.gif) |
 
 ## Architecture
 
@@ -163,7 +178,7 @@ for L0 through L5; `python docs/design/render_design_pdfs.py` regenerates PDF co
 
 - Stress-test estimated-pose control across larger randomized scenario suites.
 - Use Hybrid A* as the default mission planner after more stress testing.
-- Add richer demo GIFs, a narrated demo video, and CI-published benchmark badges.
+- Add a narrated demo video and CI-published benchmark badges.
 - Expand tests into coverage-gated CI.
 
 ## Why This Exists

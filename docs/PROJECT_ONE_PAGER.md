@@ -52,6 +52,8 @@ The stress benchmark currently runs worker-present grid/truth and grid/particle 
 Per-layer design notes live in [docs/design](design/README.md), with reproducible PDF rendering
 via `python docs/design/render_design_pdfs.py`. This one-pager renders to
 `docs/PROJECT_ONE_PAGER.pdf` via `python docs/render_project_one_pager_pdf.py`.
+Milestone demo GIFs live in `docs/milestones/` and regenerate via
+`python docs/render_milestone_demos.py`.
 
 ## Reproduce
 
@@ -78,6 +80,7 @@ python benchmarks/end_to_end_benchmark.py
 python benchmarks/stress_benchmark.py
 python docs/design/render_design_pdfs.py
 python docs/render_project_one_pager_pdf.py
+python docs/render_milestone_demos.py
 python -m pytest
 ```
 
@@ -85,4 +88,4 @@ python -m pytest
 
 - Stress-test KLD-adaptive particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
-- Add coverage badges, richer demo GIFs, and a short narrated demo video.
+- Add coverage badges and a short narrated demo video.

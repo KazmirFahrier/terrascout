@@ -29,3 +29,4 @@ jobs:
       - run: python benchmarks/stress_benchmark.py
       - run: python docs/design/render_design_pdfs.py
       - run: python docs/render_project_one_pager_pdf.py
+      - run: python docs/render_milestone_demos.py --still-only --output-dir artifacts/milestone_stills
