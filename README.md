@@ -1,5 +1,10 @@
 # TerraScout
 
+[![CI](https://github.com/KazmirFahrier/terrascout/actions/workflows/ci.yml/badge.svg)](https://github.com/KazmirFahrier/terrascout/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a GPS-degraded orchard. It was scoped for a short creator-challenge build: make the rover actually move, inspect rows, avoid obvious hazards, emit metrics, and leave a clean path for deeper robotics modules later.
 
 ![TerraScout orchard inspection animation](docs/mission_trace.gif)
@@ -60,6 +65,7 @@ python benchmarks/stress_benchmark.py
 python docs/design/render_design_pdfs.py
 python docs/render_project_one_pager_pdf.py
 python docs/render_milestone_demos.py
+python docs/update_readme_kpis.py --check
 python -m pytest
 ```
 
@@ -78,14 +84,17 @@ Run on a local laptop with the default configuration: 8 tree rows, 7 inspection 
 | 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | ~90% | ~3.2 s |
 | 20-seed 30-row acceptance | truth | 100% | 0 | 0.201 m | n/a | 10.5 s |
 
+<!-- TERRASCOUT_KPI_START -->
 Layer KPI snapshot from the current reproducible benchmark suite:
 
 | Layer | Acceptance target | Current result |
 | --- | --- | ---: |
 | L1 Kalman tracker | <0.20 m 1-second prediction error; >=95% association | 0.037 m mean; 100% association across 100 scenes |
 | L2 particle filter | <0.15 m p95 pose error; <=3,000 particles | 0.029 m p95; <=169 particles across 10 wide-prior runs |
-| L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | 0.000% gap; <30 ms unconstrained / <13 ms resource-aware |
-| 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | 10/10 goals; 0 collisions; 12.00 s max wall time |
+| L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | 0.000% gap; budget met unconstrained; budget met resource-aware |
+| 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | 10/10 goals; 0 collisions; 0.201 m mean pose; budget met wall time |
+| Default mission | 100% inspection success; no collisions | 100% success; 0 collisions |
+<!-- TERRASCOUT_KPI_END -->
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
@@ -178,8 +187,7 @@ for L0 through L5; `python docs/design/render_design_pdfs.py` regenerates PDF co
 
 - Stress-test estimated-pose control across larger randomized scenario suites.
 - Use Hybrid A* as the default mission planner after more stress testing.
-- Add a narrated demo video and CI-published benchmark badges.
-- Expand tests into coverage-gated CI.
+- Add a narrated demo video.
 
 ## Why This Exists
 

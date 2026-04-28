@@ -17,16 +17,8 @@ jobs:
       - run: ruff check .
       - run: mypy terrascout
       - run: pytest
-      - run: python benchmarks/run_benchmark.py
-      - run: python benchmarks/control_benchmark.py
-      - run: python benchmarks/tracking_benchmark.py
-      - run: python benchmarks/localization_benchmark.py
-      - run: python benchmarks/scheduler_benchmark.py
-      - run: python benchmarks/resource_scheduler_benchmark.py
-      - run: python benchmarks/planner_benchmark.py
-      - run: python benchmarks/slam_benchmark.py
-      - run: python benchmarks/end_to_end_benchmark.py
-      - run: python benchmarks/stress_benchmark.py
+      - run: python -m terrascout.runner.reproduce --skip-gif
+      - run: python docs/update_readme_kpis.py --check
       - run: python docs/design/render_design_pdfs.py
       - run: python docs/render_project_one_pager_pdf.py
       - run: python docs/render_milestone_demos.py --still-only --output-dir artifacts/milestone_stills

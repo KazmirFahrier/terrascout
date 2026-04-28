@@ -81,6 +81,7 @@ python benchmarks/stress_benchmark.py
 python docs/design/render_design_pdfs.py
 python docs/render_project_one_pager_pdf.py
 python docs/render_milestone_demos.py
+python docs/update_readme_kpis.py --check
 python -m pytest
 ```
 
@@ -88,4 +89,4 @@ python -m pytest
 
 - Stress-test KLD-adaptive particle-filter and EKF-SLAM closed-loop control across larger randomized scenario suites.
 - Stress-test Hybrid A* across denser dynamic-obstacle scenes before making it default.
-- Add coverage badges and a short narrated demo video.
+- Add a short narrated demo video.
