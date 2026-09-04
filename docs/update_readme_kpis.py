@@ -46,7 +46,7 @@ def build_kpi_block(summary_path: Path = SUMMARY) -> str:
             ),
             (
                 "| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | "
-                f"{benchmark['planner_mean_wall_time_ms']['hybrid_astar']:.1f} ms mean; "
+                f"{_budget_status(benchmark['planner_mean_wall_time_ms']['hybrid_astar'], 250.0)} solve time; "
                 f"{benchmark['planner_mean_steering_reduction_percent']:.1f}% steering reduction |"
             ),
             (

@@ -67,7 +67,10 @@ class SafetySupervisorTest(unittest.TestCase):
 
         world.step_workers(dt=0.1, avoid_pose=Pose2D(0.0, 0.0, 0.0), avoid_radius_m=1.25)
 
-        self.assertGreaterEqual(distance(world.workers[0].position, Point2D(0.0, 0.0)), 1.25)
+        # Projection onto the boundary can round one ULP below the radius.
+        self.assertGreaterEqual(
+            distance(world.workers[0].position, Point2D(0.0, 0.0)), 1.25 - 1e-12
+        )
         self.assertGreater(world.workers[0].velocity[0], 0.0)
 
 
