@@ -7,10 +7,24 @@ from terrascout.mapping.trunks import detect_tree_trunks
 from terrascout.mapping.landmarks import LandmarkMapper
 from terrascout.sim.sensors import LidarScan, SensorConfig
 from terrascout.sim.geometry import Pose2D
-from terrascout.sim.world import OrchardWorld, ScenarioConfig
+from terrascout.sim.world import LocalLidarDetection, OrchardWorld, ScenarioConfig
 
 
 class LandmarkMapperTest(unittest.TestCase):
+    def test_association_preserves_nearest_match_tie_and_gate(self) -> None:
+        for observed_range, counts in ((2.7, [1, 2]), (2.5, [2, 1]), (3.8, [1, 1, 1])):
+            with self.subTest(observed_range=observed_range):
+                mapper = LandmarkMapper(association_gate_m=0.75)
+                pose = Pose2D(0.0, 0.0, 0.0)
+                mapper.update(pose, [
+                    LocalLidarDetection(range_m=2.0, bearing_rad=0.0, kind="tree"),
+                    LocalLidarDetection(range_m=3.0, bearing_rad=0.0, kind="tree"),
+                ])
+                mapper.update(pose, [
+                    LocalLidarDetection(range_m=observed_range, bearing_rad=0.0, kind="tree")
+                ])
+                self.assertEqual([landmark.observations for landmark in mapper.landmarks], counts)
+
     def test_mapper_accumulates_tree_landmarks(self) -> None:
         world = OrchardWorld(ScenarioConfig(rows=3, trees_per_row=5, worker_count=0, random_seed=3))
         mapper = LandmarkMapper()

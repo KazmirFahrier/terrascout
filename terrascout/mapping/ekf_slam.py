@@ -71,17 +71,19 @@ class EkfSlam:
         self.mean[1] += linear_mps * sin(theta_mid) * dt
         self.mean[2] = wrap_angle(float(self.mean[2] + angular_rps * dt))
 
-        n = len(self.mean)
-        g = np.eye(n, dtype=float)
-        g[0, 2] = -linear_mps * sin(theta_mid) * dt
-        g[1, 2] = linear_mps * cos(theta_mid) * dt
-
-        r = np.zeros((n, n), dtype=float)
-        r[0, 0] = self.config.motion_linear_sigma**2
-        r[1, 1] = self.config.motion_linear_sigma**2
-        r[2, 2] = self.config.motion_angular_sigma**2
+        motion_jacobian = np.array(
+            [-linear_mps * sin(theta_mid) * dt, linear_mps * cos(theta_mid) * dt]
+        )
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-            self.covariance = g @ self.covariance @ g.T + r
+            # G differs from identity only at (0, 2) and (1, 2). Apply
+            # G P G.T directly, preserving all robot/landmark cross covariance.
+            predicted = self.covariance.copy()
+            predicted[:2, :] += motion_jacobian[:, None] * self.covariance[2, :]
+            predicted[:, :2] += predicted[:, 2, None] * motion_jacobian[None, :]
+            predicted[0, 0] += self.config.motion_linear_sigma**2
+            predicted[1, 1] += self.config.motion_linear_sigma**2
+            predicted[2, 2] += self.config.motion_angular_sigma**2
+            self.covariance = predicted
         self._stabilize_covariance()
 
     def update(self, detections: list[LocalLidarDetection]) -> None:

@@ -11,6 +11,31 @@ from terrascout.sim.world import LocalLidarDetection, OrchardWorld, ScenarioConf
 
 
 class EkfSlamTest(unittest.TestCase):
+    def test_prediction_preserves_dense_covariance_with_landmark_correlations(self) -> None:
+        rng = np.random.default_rng(23)
+        for size in (3, 9):
+            with self.subTest(state_size=size):
+                slam = EkfSlam(Pose2D(1.0, 2.0, 0.8))
+                slam.mean = np.zeros(size)
+                slam.mean[:3] = [1.0, 2.0, 0.8]
+                factor = rng.normal(size=(size, size))
+                prior = factor @ factor.T * 0.01 + np.eye(size) * 0.1
+                slam.covariance = prior.copy()
+                dt, linear, angular = 0.2, -0.7, 0.3
+                theta_mid = 0.8 + angular * dt / 2
+                jacobian = np.eye(size)
+                jacobian[0, 2] = -linear * np.sin(theta_mid) * dt
+                jacobian[1, 2] = linear * np.cos(theta_mid) * dt
+                noise = np.zeros((size, size))
+                noise[0, 0] = noise[1, 1] = slam.config.motion_linear_sigma**2
+                noise[2, 2] = slam.config.motion_angular_sigma**2
+                expected = jacobian @ prior @ jacobian.T + noise
+
+                slam.predict(linear_mps=linear, angular_rps=angular, dt=dt)
+
+                np.testing.assert_allclose(slam.covariance, expected, rtol=1e-12, atol=1e-12)
+                np.testing.assert_array_equal(slam.covariance[3:, 3:], prior[3:, 3:])
+
     def test_ekf_slam_accumulates_landmarks_and_reduces_uncertainty(self) -> None:
         world = OrchardWorld(ScenarioConfig(rows=4, trees_per_row=7, worker_count=0, random_seed=4))
         pose = Pose2D(5.0, 5.0, 0.8)
