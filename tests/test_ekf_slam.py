@@ -11,6 +11,35 @@ from terrascout.sim.world import LocalLidarDetection, OrchardWorld, ScenarioConf
 
 
 class EkfSlamTest(unittest.TestCase):
+    def test_landmark_update_matches_dense_joseph_form_with_gain_clipping(self) -> None:
+        for correlation_scale in (1.0, 40.0):
+            with self.subTest(correlation_scale=correlation_scale):
+                slam = EkfSlam(Pose2D(0.0, 0.0, 0.0))
+                slam.mean = np.array([0.0, 0.0, 0.0, 3.0, 0.0, 0.0, 4.0])
+                slam.landmark_observations = [1, 1]
+                factor = np.random.default_rng(31).normal(size=(7, 7)) * 0.03
+                factor[5] = factor[0] * correlation_scale
+                prior = factor @ factor.T + np.eye(7) * 0.001
+                slam.covariance = prior.copy()
+                h = np.array([
+                    [-1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
+                    [0.0, -1.0 / 3.0, -1.0, 0.0, 1.0 / 3.0, 0.0, 0.0],
+                ])
+                noise = np.diag([slam.config.range_sigma**2, slam.config.bearing_sigma**2])
+                gain = prior @ h.T @ np.linalg.inv(h @ prior @ h.T + noise)
+                if correlation_scale > 1:
+                    self.assertGreater(np.max(np.abs(gain)), 5.0)
+                gain = np.clip(gain, -5.0, 5.0)
+                projection = np.clip(np.eye(7) - gain @ h, -5.0, 5.0)
+                expected = projection @ prior @ projection.T + gain @ noise @ gain.T
+
+                slam._update_landmark(
+                    0, LocalLidarDetection(range_m=3.1, bearing_rad=0.04, kind="tree")
+                )
+
+                np.testing.assert_allclose(slam.covariance, expected, rtol=1e-12, atol=1e-12)
+                self.assertEqual(slam.landmark_observations, [2, 1])
+
     def test_prediction_preserves_dense_covariance_with_landmark_correlations(self) -> None:
         rng = np.random.default_rng(23)
         for size in (3, 9):

@@ -169,11 +169,20 @@ class EkfSlam:
         kalman_gain = np.clip(kalman_gain, -5.0, 5.0)
         self.mean = self.mean + kalman_gain @ innovation
         self.mean[2] = wrap_angle(float(self.mean[2]))
-        identity = np.eye(len(self.mean), dtype=float)
         with np.errstate(over="ignore", invalid="ignore", divide="ignore"):
-            residual_projection = np.clip(identity - kalman_gain @ h, -5.0, 5.0)
+            # Only robot pose and the observed landmark appear in H. The
+            # clipped Joseph projection therefore differs from identity in
+            # these five columns only; apply it in quadratic time.
+            indices = [0, 1, 2, 3 + 2 * landmark_index, 4 + 2 * landmark_index]
+            identity_columns = np.zeros((len(self.mean), len(indices)))
+            identity_columns[indices, np.arange(len(indices))] = 1.0
+            delta = (
+                np.clip(identity_columns - kalman_gain @ h[:, indices], -5.0, 5.0)
+                - identity_columns
+            )
+            projected = self.covariance + delta @ self.covariance[indices, :]
             self.covariance = (
-                residual_projection @ self.covariance @ residual_projection.T
+                projected + projected[:, indices] @ delta.T
                 + kalman_gain @ measurement_noise @ kalman_gain.T
             )
         self._stabilize_covariance()
