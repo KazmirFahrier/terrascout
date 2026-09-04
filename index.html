@@ -1002,7 +1002,7 @@
     <p class="section-intro">
       Every layer ships with a benchmark script that emits a CSV; CI re-runs the
       suite on every push to <code style="font-family:'JetBrains Mono',monospace; color:var(--amber-soft); font-size:14px;">main</code>.
-      These are the headline numbers from the current run.
+      These figures come from a recorded local reference run. Timings vary with hardware; each reproduction records fresh measurements in its benchmark CSV files.
     </p>
 
     <div class="kpis">
@@ -1120,9 +1120,9 @@
 
     <div class="eng">
       <ul class="eng-list">
-        <li><span class="check">✓</span><span class="lbl">Language</span><span class="val"><strong>Python 3.9+</strong> · 100% Python</span></li>
+        <li><span class="check">✓</span><span class="lbl">Language</span><span class="val"><strong>Python 3.11+</strong> · 100% Python</span></li>
         <li><span class="check">✓</span><span class="lbl">Tests</span><span class="val"><strong>pytest + unittest</strong> · per-layer suites</span></li>
-        <li><span class="check">✓</span><span class="lbl">Coverage</span><span class="val"><strong>90%+</strong> line coverage gate</span></li>
+        <li><span class="check">✓</span><span class="lbl">Coverage</span><span class="val"><strong>90%+</strong> measured coverage · 80% minimum gate</span></li>
         <li><span class="check">✓</span><span class="lbl">CI</span><span class="val"><strong>GitHub Actions</strong> · ruff · mypy · pytest</span></li>
         <li><span class="check">✓</span><span class="lbl">Reproducibility</span><span class="val"><strong>Seedable</strong> · scenario JSONs · deterministic CSVs</span></li>
         <li><span class="check">✓</span><span class="lbl">Docs</span><span class="val"><strong>Per-module derivation PDFs</strong> · one-pager · KPI auto-update</span></li>
@@ -1157,7 +1157,7 @@
         <li>Built a pose-graph <strong>EKF-SLAM</strong> module with Mahalanobis-gated data association on lidar-detected tree trunks; achieved <span class="num">0.032 m</span> drift-corrected pose and <span class="num">0.070 m</span> landmark error after 5-minute traversals across procedurally generated 12×30-row orchards.</li>
         <li>Developed a <strong>Hybrid A* planner</strong> with bounded-curvature analytic connectors on a SLAM cost map inflated by Kalman-predicted worker positions; cut total steering effort by <span class="num">86.6%</span> vs. baseline grid A* with mean solve time <span class="num">28.5 ms</span>.</li>
         <li>Solved orchard inspection scheduling as an <strong>MDP via value iteration</strong> over battery-SOC and time-of-day state; computed policy reaches the oracle exactly (<span class="num">0.00%</span> gap) across 50 randomized layouts under battery + daylight constraints.</li>
-        <li>Engineered a reproducible benchmark + CI pipeline (ruff, mypy --strict, pytest, <span class="num">90%+</span> coverage) that auto-publishes KPI tables to the project README on every push to <code style="font-family:'JetBrains Mono',monospace;">main</code>.</li>
+        <li>Engineered a reproducible benchmark + CI pipeline (ruff, mypy --strict, pytest, <span class="num">90%+</span> coverage) that validates the project README against regenerated benchmark results on every push to <code style="font-family:'JetBrains Mono',monospace;">main</code>.</li>
       </ul>
 
       <div class="copy-row">

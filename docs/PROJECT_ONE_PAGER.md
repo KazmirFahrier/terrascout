@@ -18,7 +18,10 @@ TerraScout is a simulation-first autonomy stack for a differential-drive crop-in
 | L7 Safety | Command supervision | Wheel-command scaling near perceived or predicted workers |
 | Sensors | Lidar + IMU + encoders | 270-degree / 0.5-degree lidar scans, yaw-rate samples, and wheel-encoder ticks |
 
-## Current Metrics
+## Reference Metrics
+
+These are recorded local reference measurements. Each reproduction writes fresh results
+to the benchmark CSV files; elapsed times vary with hardware.
 
 Default mission/module benchmark seeds: `2, 3, 5, 7, 11`. The L1 tracking acceptance
 benchmark uses 100 deterministic scenes (`0..99`).
