@@ -1,11 +1,14 @@
 """Keep README checks sensitive to results, without requiring identical hardware."""
 
 import json
+import runpy
 import tempfile
 import unittest
 from pathlib import Path
 
-from docs.update_readme_kpis import build_kpi_block
+build_kpi_block = runpy.run_path(
+    str(Path(__file__).resolve().parents[1] / "docs" / "update_readme_kpis.py")
+)["build_kpi_block"]
 
 
 class ReadmeKpiTest(unittest.TestCase):
