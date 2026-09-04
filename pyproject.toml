@@ -7,7 +7,7 @@ name = "terrascout"
 version = "0.1.0"
 description = "A compact autonomy demo for a crop-inspection rover in GPS-degraded orchards."
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Kazmir Fahrier" }]
 dependencies = [
@@ -33,12 +33,17 @@ include = ["terrascout*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py39"
+target-version = "py311"
+
+[tool.ruff.lint]
+# Keep the original CI rule set explicit across Ruff releases.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.mypy]
-python_version = "3.9"
+# Use the active interpreter so installed dependency stubs match its syntax.
 strict = true
 packages = ["terrascout"]
 
 [tool.pytest.ini_options]
-addopts = "--cov=terrascout --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=terrascout --cov-report=term-missing --cov-fail-under=80 -m 'not performance'"
+markers = ["performance: elapsed time checks that must run without coverage instrumentation"]

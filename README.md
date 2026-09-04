@@ -1,7 +1,7 @@
 # TerraScout
 
 [![CI](https://github.com/KazmirFahrier/terrascout/actions/workflows/ci.yml/badge.svg)](https://github.com/KazmirFahrier/terrascout/actions/workflows/ci.yml)
-![Python](https://img.shields.io/badge/python-3.9%2B-blue)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -33,6 +33,9 @@ TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a
 This is a simulation-first autonomy stack, not a finished field robot. The default mission uses ground-truth pose for the most stable demo path, but estimated-pose control is available with `--pose-source particle` or `--pose-source slam`. Hybrid A* is available with `--planner hybrid`.
 
 ## Quick Start
+
+Use Python 3.11 or newer. CI runs on Python 3.11, and mypy uses the active
+interpreter version when checking installed NumPy and Matplotlib stubs.
 
 ```bash
 python -m venv .venv
@@ -68,7 +71,12 @@ python docs/render_project_one_pager_pdf.py
 python docs/render_milestone_demos.py
 python docs/update_readme_kpis.py --check
 python -m pytest
+python -m pytest -m performance --no-cov
 ```
+
+The default test run measures coverage for functional checks. Run the performance
+marker separately without coverage instrumentation to check the five second
+mission runtime budget for both grid and hybrid planners. CI runs both commands.
 
 If `pytest` is not installed, the tests also run with the standard library:
 
@@ -93,11 +101,15 @@ Layer KPI snapshot from the current reproducible benchmark suite:
 | L1 Kalman tracker | <0.20 m 1-second prediction error; >=95% association | 0.037 m mean; 100% association across 100 scenes |
 | L2 particle filter | <0.15 m p95 pose error; <=3,000 particles | 0.029 m p95; <=169 particles across 10 wide-prior runs |
 | L3 EKF-SLAM | <0.20 m pose error; <0.30 m landmark error | 0.032 m mean pose; 0.070 m mean landmarks; 160 landmarks |
-| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | 28.5 ms mean; 86.6% steering reduction |
+| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | budget met solve time; 86.6% steering reduction |
 | L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | 0.000% gap; budget met unconstrained; budget met resource-aware |
 | 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | 10/10 goals; 0 collisions; 0.201 m mean pose; budget met wall time |
 | Default mission | 100% inspection success; no collisions | 100% success; 0 collisions |
 <!-- TERRASCOUT_KPI_END -->
+
+The managed table checks timing against the stated budgets because exact elapsed
+times vary by machine and load. Each reproduction saves its measured timings in
+the benchmark CSV files and `artifacts/reproduce_summary.json`.
 
 Benchmark output is written to `artifacts/benchmark.csv`.
 
