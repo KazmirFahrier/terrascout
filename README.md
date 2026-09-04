@@ -86,7 +86,7 @@ python -m unittest discover -s tests
 
 ## Current Benchmark
 
-Run on a local laptop with the default configuration: 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker.
+The table below records an earlier local reference run with 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker. Timings depend on hardware; each reproduction writes fresh measurements to the benchmark outputs.
 
 | Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Final SOC | Mean wall time |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
@@ -127,7 +127,7 @@ Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the
 
 SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark runs 5-minute traversals across ten 12x30 orchard layouts, observes up to 160 tree landmarks per layout, and reports final pose plus landmark-map error against ground truth. The scan-space tree-trunk detector lives in `terrascout/mapping/trunks.py` and is covered by unit tests against synthetic circles and full orchard lidar scans.
 
-End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The current suite completes all priority goals with zero collisions, 0.201 m mean pose error, and a 12.00 s max single-mission wall time.
+End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The recorded reference run completed all priority goals with zero collisions, 0.201 m mean pose error, and a 12.00 s maximum mission wall time.
 
 Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
 

@@ -8,7 +8,7 @@ surface that can be swapped for EKF-SLAM without changing callers.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import cos, sin
+from math import cos, hypot, sin
 
 import numpy as np
 from numpy.typing import NDArray
@@ -76,7 +76,10 @@ class LandmarkMapper:
     def _associate(self, measurement: NDArray[np.float64]) -> int | None:
         if not self.landmarks:
             return None
-        distances = [float(np.linalg.norm(landmark.mean - measurement)) for landmark in self.landmarks]
+        x, y = float(measurement[0]), float(measurement[1])
+        distances = [
+            hypot(float(landmark.mean[0]) - x, float(landmark.mean[1]) - y)
+            for landmark in self.landmarks
+        ]
         idx = int(np.argmin(distances))
         return idx if distances[idx] <= self.association_gate_m else None
-
