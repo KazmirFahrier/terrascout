@@ -71,7 +71,12 @@ python docs/render_project_one_pager_pdf.py
 python docs/render_milestone_demos.py
 python docs/update_readme_kpis.py --check
 python -m pytest
+python -m pytest -m performance --no-cov
 ```
+
+The default test run measures coverage for functional checks. Run the performance
+marker separately without coverage instrumentation to check the five second
+mission runtime budget for both grid and hybrid planners. CI runs both commands.
 
 If `pytest` is not installed, the tests also run with the standard library:
 

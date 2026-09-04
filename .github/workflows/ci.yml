@@ -16,7 +16,8 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: ruff check .
       - run: mypy terrascout
-      - run: pytest
+      - run: python -m pytest -m performance --no-cov
+      - run: python -m pytest
       - run: python -m terrascout.runner.reproduce --skip-gif
       - run: python docs/update_readme_kpis.py --check
       - run: python docs/design/render_design_pdfs.py
