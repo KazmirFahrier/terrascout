@@ -63,8 +63,7 @@ The linear target speed ramps down inside `slow_radius_m`:
 v_target = min(v_cruise, v_cruise * d / slow_radius)
 ```
 
-If the rover is pointed far away from the target (`abs(e_theta) > 1.2 rad`), the target speed
-is reduced to 25 percent so heading correction dominates translation.
+If the heading error exceeds 0.3 rad, translation stops and the rover rotates toward the target. Speed feedback uses the measured encoder speed in mission runs, with the target speed as feedforward.
 
 Each PID loop applies:
 
@@ -86,13 +85,16 @@ Both outputs are clipped to the rover speed limits.
 ## Pseudocode
 
 ```text
-function wheel_commands(pose, waypoint, dt):
+function wheel_commands(pose, waypoint, dt, measured_speed):
     distance = norm(waypoint - pose.xy)
     heading_error = wrap(atan2(waypoint.y - pose.y, waypoint.x - pose.x) - pose.theta)
     speed_target = min(cruise_speed, cruise_speed * distance / slow_radius)
-    if abs(heading_error) > 1.2:
-        speed_target = 0.25 * speed_target
-    linear = speed_pid.update(speed_target, dt)
+    if abs(heading_error) > 0.3:
+        speed_target = 0
+        speed_pid.reset()
+    linear = max(0, speed_target + speed_pid.update(speed_target - measured_speed, dt))
+    if speed_target == 0:
+        linear = 0
     angular = heading_pid.update(heading_error, dt)
     return clip(linear - angular * b / 2), clip(linear + angular * b / 2)
 ```

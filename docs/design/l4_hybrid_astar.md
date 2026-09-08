@@ -1,127 +1,46 @@
-# L4 Hybrid A* Planning Design Note
+# L4 Planning Design Note
 
 ## Purpose
 
-L4 converts row goals into kinematically feasible pose paths while avoiding tree trunks and
-predicted worker positions. TerraScout keeps both a grid A* baseline and a heading-aware Hybrid
-A* planner so benchmark results can compare smoothness and steering effort.
+TerraScout provides grid A* and a heading aware Hybrid A* search over a known orchard map. Their output is a checked geometric path for a differential drive follower. Final heading and bounded curvature are not guaranteed by the goal connector or the grid fallback.
 
-Implementation: `terrascout/plan/astar.py`, `terrascout/plan/hybrid_astar.py`
+Implementation: terrascout/plan/astar.py and terrascout/plan/hybrid_astar.py.
 
-Benchmark: `benchmarks/planner_benchmark.py`
+## Footprint and occupancy
 
-## Occupancy Model
-
-The planner builds an inflated grid over the orchard:
+The rover is modeled as a circle of radius 0.45 m. Trees have radius 0.18 m and workers normally have radius 0.35 m. Grid planning adds an explicit margin and the half diagonal of a cell to obstacle inflation:
 
 ```text
 cell_size = 0.4 m
-tree_radius = 0.38 m
-worker_radius = 0.75 m
+tree_centre_exclusion = 0.45 + 0.18 + 0.20 = 0.83 m
+worker_centre_exclusion = 0.45 + 0.35 + 0.40 = 1.20 m
+grid_padding = cell_size / sqrt(2)
+boundary_margin = 0.45 + 0.10 = 0.55 m
 ```
 
-Tree landmarks and Kalman-predicted worker positions mark occupied cells within their inflation
-radii. Start and goal cells are projected to the nearest free cell when necessary.
+The padding covers the space between grid cell centres. Continuous segment checks also validate the rover centre against obstacle circles and orchard boundaries. A physically clear endpoint may connect to a nearby free grid cell only when the entire connection is clear. An occupied goal is not silently replaced by an unreachable destination.
 
-## Grid A* Baseline
+## Grid A*
 
-The baseline planner uses an 8-connected grid:
+The search uses eight neighbors with unit cardinal cost and diagonal cost 1.414. A diagonal step is rejected if either adjacent orthogonal cell is blocked. The heuristic is Euclidean distance in cell units. Reconstructed paths retain direction changes and include exact, checked start and goal connections. An unsuccessful search returns an empty path.
 
-```text
-N = {left, right, up, down, diagonals}
-cost = 1 for cardinal moves
-cost = 1.414 for diagonal moves
-heuristic = Euclidean distance in cells
-```
+## Hybrid A*
 
-The reconstructed path is sparsified by retaining cells at direction changes.
+Hybrid search uses a coarse position grid with 24 heading bins. Each state also retains a continuous pose. Forward and reverse motion primitives use a 0.8 m step and a nominal 1.2 m turn radius. Their integration matches the simulator's midpoint position update. Every intermediate segment is checked; testing just the endpoint would allow a primitive to cross an obstacle.
 
-## Hybrid A* State
+A lightweight connector tries forward and reverse approaches to the goal before and during lattice search. It is not an optimal Reeds Shepp solver. The final geometric goal connection and the grid fallback do not enforce the nominal turn radius or goal orientation. Only collinear points may be removed without a new collision check. Equal heading bins alone do not establish that the chord is clear.
 
-Hybrid A* searches a coarse lattice:
+Primitive cost includes distance, a turn penalty, and a reverse penalty. The heuristic adds a heading preference to Euclidean distance. Search is bounded by max_expansions; exhaustion invokes grid A*. Failure of that fallback also returns an empty path.
 
-```text
-s = [cell_x, cell_y, heading_bin]
-heading_bins = 24
-```
+## Execution and evaluation
 
-Each state also stores a continuous pose for expansion:
+A missing path commands zero motion and triggers later retries. The follower turns before translating. Grid paths retain their sparse corners; lookahead is limited to dense Hybrid A* samples and requires additional clearance. A command guard checks proposed motion using the selected navigation estimate and known map. A separate evaluator uses simulated actual motion and physical body radii to report contact with trees, independently moving workers, or boundaries.
 
-```text
-p = [x, y, theta]
-```
+## Benchmark interpretation
 
-## Motion Primitives
-
-Each expansion applies forward and reverse arc primitives:
-
-```text
-direction in {+1, -1}
-turn in {-step / r_min, 0, +step / r_min}
-theta_mid = theta + 0.5 * direction * turn
-x' = x + direction * step * cos(theta_mid)
-y' = y + direction * step * sin(theta_mid)
-theta' = wrap(theta + direction * turn)
-```
-
-The implementation uses a minimum-turn-radius lattice (`r_min = 1.2 m`), reverse penalties, and
-a lightweight analytic connector. The connector simulates bounded-curvature forward and reverse
-approaches to the goal and accepts the connector only when all sampled poses remain in free
-space. This is not a full optimal Reeds-Shepp solver, but it provides the same Hybrid A*
-analytic-expansion role: quickly finish near-goal states with feasible curvature before falling
-back to lattice expansion.
-
-## Cost And Heuristic
-
-Primitive cost:
-
-```text
-cost = step
-if turning: cost += turn_cost
-if reversing: cost += reverse_cost
-```
-
-Heuristic:
-
-```text
-h = EuclideanDistance(p, goal) + heading_cost * abs(wrap(heading_to_goal - theta))
-```
-
-The planner first tries the analytic connector directly from the start. During lattice search, it
-tries the connector again whenever a state is within `analytic_expansion_distance_m` of the goal.
-If the search exceeds `max_expansions`, it falls back to the grid A* baseline and annotates
-heading from path segments.
-
-## Pseudocode
-
-```text
-function hybrid_plan(start, goal, predicted_workers):
-    blocked = inflated occupancy grid
-    if analytic_connector(start, goal) is collision-free:
-        return connector path
-    open = priority queue with start
-    while open is not empty and expansions < max_expansions:
-        current = pop best f = g + h
-        if current reaches goal:
-            return reconstruct path
-        if current is near goal and analytic_connector(current, goal) is collision-free:
-            return reconstruct prefix + connector
-        for primitive in forward/reverse arc primitives:
-            next = integrate primitive
-            if next cell is free and tentative cost improves:
-                record parent and push
-    return grid_astar_fallback(start, goal)
-```
-
-## Acceptance Evidence
-
-The planner benchmark compares grid A* and Hybrid A* on deterministic orchard scenes and reports
-waypoint count, path length, steering effort, and wall time. Current results show the Hybrid A*
-path has much lower steering effort than the grid baseline while the analytic connector keeps
-planning time comfortably within the CPU budget.
+Both planners report the same sum of geometric segment heading changes, plus path length, waypoint count, and solve time. This is not measured actuator steering effort. Negative steering reduction is retained when Hybrid A* performs worse. A zero waypoint result is a planning failure, not a successful short route. Read the current README snapshot and retained CI CSVs for measured results.
 
 ## References
 
-- Dolgov, Thrun, Montemerlo, and Diebel, Path Planning for Autonomous Vehicles in Unknown
-  Semi-structured Environments.
-- LaValle, Planning Algorithms, graph search and kinodynamic planning.
+* Dolgov, Thrun, Montemerlo, and Diebel, Path Planning for Autonomous Vehicles in Unknown Semi structured Environments.
+* LaValle, Planning Algorithms, graph search and kinodynamic planning.

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>TerraScout — A modular autonomy stack for crop-inspection rovers</title>
-<meta name="description" content="A six-layer Python autonomy stack for a simulated GPS-degraded crop-inspection rover. PID, Kalman, MCL, EKF-SLAM, Hybrid A*, and MDP — built end-to-end by Kazmir Fahrier." />
+<title>TerraScout | Kazmir Fahrier</title>
+<meta name="description" content="An orchard robotics simulation by Kazmir Fahrier with estimated pose navigation, independent collision evaluation, and reproducible evidence." />
 <meta name="author" content="Kazmir Fahrier" />
-<meta property="og:title" content="TerraScout — Autonomy stack for a crop-inspection rover" />
-<meta property="og:description" content="Six layers, end-to-end, beating every acceptance target. PID → Kalman → MCL → EKF-SLAM → Hybrid A* → MDP." />
+
+
 <meta property="og:type" content="website" />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -737,518 +737,57 @@
 </style>
 </head>
 <body>
-
-<!-- TOP BAR -->
-<div class="topbar">
-  <div class="topbar-inner">
-    <a href="#" class="brand">TerraScout <span class="dot">●</span> v1.0</a>
-    <nav class="navlinks">
-      <a href="#system">System</a>
-      <a href="#performance">Performance</a>
-      <a href="#mission">Mission</a>
-      <a href="#about">About</a>
-      <a href="https://github.com/KazmirFahrier/terrascout" target="_blank" rel="noopener">GitHub ↗</a>
-    </nav>
+<div class="topbar"><div class="topbar-inner">
+  <a href="#" class="brand">TerraScout <span class="dot">●</span> v0.2.0</a>
+  <nav class="navlinks"><a href="#system">System</a><a href="#evidence">Evidence</a><a href="#scope">Scope</a><a href="https://github.com/KazmirFahrier/terrascout">GitHub ↗</a></nav>
+</div></div>
+<main class="wrap">
+<header class="hero">
+  <div class="eyebrow">Robotics software · Synthetic orchard · Kazmir Fahrier</div>
+  <h1 class="title">Terra<em>Scout</em></h1>
+  <p class="lede">An orchard autonomy simulation that connects particle localization, worker tracking, mapping, planning, and rover control. Every executed tick is checked independently for contact with trees, workers, and boundaries.</p>
+  <div class="meta-row">
+    <div class="meta-cell"><div class="meta-label">Default navigation</div><div class="meta-value">Particle filter</div></div>
+    <div class="meta-cell"><div class="meta-label">Evaluation</div><div class="meta-value">Swept footprint</div></div>
+    <div class="meta-cell"><div class="meta-label">Workers</div><div class="meta-value">Independent motion</div></div>
+    <div class="meta-cell"><div class="meta-label">Environment</div><div class="meta-value">Simulation</div></div>
   </div>
-</div>
-
-<div class="wrap">
-
-  <!-- HERO -->
-  <header class="hero">
-    <div class="eyebrow">
-      <span class="blink"></span>
-      Telemetry &nbsp; · &nbsp; Mission Logged &nbsp; · &nbsp; 2026
-    </div>
-
-    <h1 class="title">Terra<em>Scout</em></h1>
-
-    <p class="lede">
-      A six-layer Python autonomy stack for a simulated crop-inspection rover
-      operating in <em>GPS-degraded orchards</em>. PID, Kalman, particle filter,
-      EKF-SLAM, Hybrid&nbsp;A*, and an MDP scheduler — built end-to-end, every
-      acceptance target beaten.
-    </p>
-
-    <div class="meta-row">
-      <div class="meta-cell">
-        <div class="meta-label">Mission Success</div>
-        <div class="meta-value"><span class="ok">10 / 10</span> priority rows</div>
-      </div>
-      <div class="meta-cell">
-        <div class="meta-label">Mean Pose Error</div>
-        <div class="meta-value">0.201&thinsp;m <span class="ok">·</span> tgt&nbsp;0.25</div>
-      </div>
-      <div class="meta-cell">
-        <div class="meta-label">Wall Time (30 rows)</div>
-        <div class="meta-value">12&thinsp;s <span class="ok">·</span> tgt&nbsp;60</div>
-      </div>
-      <div class="meta-cell">
-        <div class="meta-label">Coverage</div>
-        <div class="meta-value">90%+ <span class="ok">✓</span></div>
-      </div>
-    </div>
-
-    <div class="hero-cta">
-      <a class="btn primary" href="https://github.com/KazmirFahrier/terrascout" target="_blank" rel="noopener">
-        View Repository <span class="arrow">→</span>
-      </a>
-      <a class="btn" href="#mission">Watch Mission</a>
-      <a class="btn" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/PROJECT_ONE_PAGER.pdf" target="_blank" rel="noopener">One-Pager (PDF)</a>
-    </div>
-
-    <!-- Hero illustration -->
-    <div class="hero-vis">
-      <div class="vis-header">
-        <span>NODE_01 / orchard_block_A — sim trace</span>
-        <span class="live">LIVE</span>
-      </div>
-      <svg class="orchard-svg" viewBox="0 0 720 280" xmlns="http://www.w3.org/2000/svg" aria-label="Schematic of the orchard rover mission">
-        <defs>
-          <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
-            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="#1d2620" stroke-width="0.6"/>
-          </pattern>
-          <radialGradient id="scanGrad" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stop-color="#e8a33d" stop-opacity="0.45"/>
-            <stop offset="60%" stop-color="#e8a33d" stop-opacity="0.07"/>
-            <stop offset="100%" stop-color="#e8a33d" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-        <rect width="720" height="280" fill="url(#grid)"/>
-
-        <!-- orchard rows: trees -->
-        <g fill="#7bb89c" opacity="0.6">
-          <!-- row 1 -->
-          <g>
-            <circle cx="80" cy="60" r="6"/><circle cx="160" cy="60" r="6"/>
-            <circle cx="240" cy="60" r="6"/><circle cx="320" cy="60" r="6"/>
-            <circle cx="400" cy="60" r="6"/><circle cx="480" cy="60" r="6"/>
-            <circle cx="560" cy="60" r="6"/><circle cx="640" cy="60" r="6"/>
-          </g>
-          <!-- row 2 -->
-          <g opacity="0.85">
-            <circle cx="80" cy="100" r="6"/><circle cx="160" cy="100" r="6"/>
-            <circle cx="240" cy="100" r="6"/><circle cx="320" cy="100" r="6"/>
-            <circle cx="400" cy="100" r="6"/><circle cx="480" cy="100" r="6"/>
-            <circle cx="560" cy="100" r="6"/><circle cx="640" cy="100" r="6"/>
-          </g>
-          <!-- row 3 -->
-          <g>
-            <circle cx="80" cy="180" r="6"/><circle cx="160" cy="180" r="6"/>
-            <circle cx="240" cy="180" r="6"/><circle cx="320" cy="180" r="6"/>
-            <circle cx="400" cy="180" r="6"/><circle cx="480" cy="180" r="6"/>
-            <circle cx="560" cy="180" r="6"/><circle cx="640" cy="180" r="6"/>
-          </g>
-          <!-- row 4 -->
-          <g opacity="0.85">
-            <circle cx="80" cy="220" r="6"/><circle cx="160" cy="220" r="6"/>
-            <circle cx="240" cy="220" r="6"/><circle cx="320" cy="220" r="6"/>
-            <circle cx="400" cy="220" r="6"/><circle cx="480" cy="220" r="6"/>
-            <circle cx="560" cy="220" r="6"/><circle cx="640" cy="220" r="6"/>
-          </g>
-        </g>
-
-        <!-- planned path -->
-        <path class="rover-path" d="M 40 240 L 680 240 Q 700 240 700 220 L 700 180 Q 700 160 680 160 L 40 160 Q 20 160 20 140 L 20 120 Q 20 100 40 100 L 680 100 Q 700 100 700 80 L 40 80"
-              fill="none" stroke="#e8a33d" stroke-width="1.2" opacity="0.55"/>
-
-        <!-- worker -->
-        <g transform="translate(360, 140)">
-          <circle r="4" fill="#d97e6a"/>
-          <circle r="14" fill="none" stroke="#d97e6a" stroke-width="0.6" opacity="0.6"/>
-        </g>
-
-        <!-- rover -->
-        <g class="rover-marker">
-          <circle r="32" fill="url(#scanGrad)"/>
-          <g class="scan-arc">
-            <path d="M 0 0 L 28 -16 A 32 32 0 0 1 28 16 Z" fill="#e8a33d" opacity="0.35"/>
-          </g>
-          <rect x="-7" y="-5" width="14" height="10" fill="#ece3d2" rx="1"/>
-          <rect x="-9" y="-6" width="2" height="12" fill="#8c8a78"/>
-          <rect x="7"  y="-6" width="2" height="12" fill="#8c8a78"/>
-        </g>
-
-        <!-- legend -->
-        <g font-family="JetBrains Mono, monospace" font-size="9" fill="#8c8a78" letter-spacing="1">
-          <text x="20" y="20">PLANNED PATH ─ ─</text>
-          <text x="200" y="20">● TREE</text>
-          <text x="270" y="20" fill="#d97e6a">● WORKER</text>
-          <text x="350" y="20" fill="#e8a33d">◉ ROVER + LIDAR</text>
-        </g>
-      </svg>
-    </div>
-  </header>
-
-  <!-- THE SYSTEM -->
-  <section id="system" class="reveal">
-    <div class="section-num">§ 01 — System Architecture</div>
-    <h2 class="section-title">Six layers, <em>narrow interfaces</em>.</h2>
-    <p class="section-intro">
-      Each layer is independently testable but composes into one end-to-end mission —
-      from cold boot at the field edge, through localization, planning, and inspection,
-      to a complete pass over a target orchard block.
-    </p>
-
-    <div class="arch">
-      <div class="layer">
-        <div class="layer-id">L0</div>
-        <div class="layer-body">
-          <h3 class="layer-name">Drive Controller</h3>
-          <div class="layer-tech">Twin-loop PID — linear velocity + heading</div>
-          <p class="layer-desc">Tracks kinematic setpoints by closing the loop on left/right wheel velocities. The inner loop of the entire stack.</p>
-        </div>
-        <div class="layer-result">
-          <span class="target">10 randomized slip/friction runs</span>
-          <span class="actual">benchmark suite green</span>
-        </div>
-        <div class="layer-margin">
-          <span class="big">PID</span>
-          <span class="small">closed-loop</span>
-        </div>
-      </div>
-
-      <div class="layer">
-        <div class="layer-id">L1</div>
-        <div class="layer-body">
-          <h3 class="layer-name">Worker Tracker</h3>
-          <div class="layer-tech">Constant-velocity Kalman filter</div>
-          <p class="layer-desc">Tracks moving agents detected as lidar clusters; predicts each track 1 second ahead so the planner can inflate cost.</p>
-        </div>
-        <div class="layer-result">
-          <span class="target">tgt &lt; 0.20 m, ≥ 95% assoc</span>
-          <span class="actual">→ 0.037 m, 100% assoc</span>
-        </div>
-        <div class="layer-margin">
-          <span class="big">5.4×</span>
-          <span class="small">vs target</span>
-        </div>
-      </div>
-
-      <div class="layer">
-        <div class="layer-id">L2</div>
-        <div class="layer-body">
-          <h3 class="layer-name">Global Localizer</h3>
-          <div class="layer-tech">Monte-Carlo localization — KLD adaptive resampling</div>
-          <p class="layer-desc">Recovers rover pose at startup or after GNSS dropout using lidar scan matching against a coarse prior orchard map.</p>
-        </div>
-        <div class="layer-result">
-          <span class="target">tgt &lt; 0.15 m p95, ≤ 3000 particles</span>
-          <span class="actual">→ 0.029 m p95, ≤ 169 particles</span>
-        </div>
-        <div class="layer-margin">
-          <span class="big">5.2×</span>
-          <span class="small">vs target</span>
-        </div>
-      </div>
-
-      <div class="layer">
-        <div class="layer-id">L3</div>
-        <div class="layer-body">
-          <h3 class="layer-name">Pose-Graph SLAM</h3>
-          <div class="layer-tech">EKF-SLAM with tree-trunk landmarks · RANSAC + Mahalanobis gating</div>
-          <p class="layer-desc">Continuously fuses odometry and lidar-detected trunks to refine rover pose and the orchard map online.</p>
-        </div>
-        <div class="layer-result">
-          <span class="target">tgt &lt; 0.20 m pose, &lt; 0.30 m landmarks</span>
-          <span class="actual">→ 0.032 m pose, 0.070 m landmarks</span>
-        </div>
-        <div class="layer-margin">
-          <span class="big">6.3×</span>
-          <span class="small">vs target</span>
-        </div>
-      </div>
-
-      <div class="layer">
-        <div class="layer-id">L4</div>
-        <div class="layer-body">
-          <h3 class="layer-name">Kinematic Planner</h3>
-          <div class="layer-tech">Hybrid A* on (x, y, θ) lattice + analytic bounded-curvature connector</div>
-          <p class="layer-desc">Plans a kinematically feasible path on the SLAM cost map, inflated by Kalman-predicted worker positions from L1.</p>
-        </div>
-        <div class="layer-result">
-          <span class="target">tgt ≤ 250 ms, ≥ 30% steering reduction</span>
-          <span class="actual">→ 28.5 ms, 86.6% reduction</span>
-        </div>
-        <div class="layer-margin">
-          <span class="big">8.8×</span>
-          <span class="small">vs target</span>
-        </div>
-      </div>
-
-      <div class="layer">
-        <div class="layer-id">L5</div>
-        <div class="layer-body">
-          <h3 class="layer-name">Inspection Scheduler</h3>
-          <div class="layer-tech">Markov decision process — value iteration</div>
-          <p class="layer-desc">Chooses which orchard row to inspect next under battery state-of-charge, daylight, and row-priority constraints.</p>
-        </div>
-        <div class="layer-result">
-          <span class="target">tgt ≤ 5% oracle gap, &lt; 800 ms</span>
-          <span class="actual">→ 0.000% gap, well under budget</span>
-        </div>
-        <div class="layer-margin">
-          <span class="big">∞</span>
-          <span class="small">oracle-equiv.</span>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- PERFORMANCE -->
-  <section id="performance" class="reveal">
-    <div class="section-num">§ 02 — Headline Performance</div>
-    <h2 class="section-title">Measured numbers, <em>not adjectives</em>.</h2>
-    <p class="section-intro">
-      Every layer ships with a benchmark script that emits a CSV; CI re-runs the
-      suite on every push to <code style="font-family:'JetBrains Mono',monospace; color:var(--amber-soft); font-size:14px;">main</code>.
-      These figures come from a recorded local reference run. Timings vary with hardware; each reproduction records fresh measurements in its benchmark CSV files.
-    </p>
-
-    <div class="kpis">
-      <div class="kpi">
-        <div class="kpi-label">L1 · Worker prediction error (1&thinsp;s ahead)</div>
-        <div class="kpi-value">0.037<span class="unit">m</span></div>
-        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">&lt; 0.20 m</span> · 100 scenes</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">L2 · MCL pose error, p95</div>
-        <div class="kpi-value">0.029<span class="unit">m</span></div>
-        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">&lt; 0.15 m</span> · ≤ 169 particles</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">L3 · EKF-SLAM mean pose error</div>
-        <div class="kpi-value">0.032<span class="unit">m</span></div>
-        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">&lt; 0.20 m</span> · 10 layouts</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">L4 · Hybrid A* mean solve time</div>
-        <div class="kpi-value">28.5<span class="unit">ms</span></div>
-        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">≤ 250 ms</span> · 86.6% steering Δ</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">L5 · MDP optimality gap vs oracle</div>
-        <div class="kpi-value">0.00<span class="unit">%</span></div>
-        <div class="kpi-target"><span class="vs">vs target</span> <span class="tgt">≤ 5%</span> · 50 layouts</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">End-to-end · 30-row priority pass</div>
-        <div class="kpi-value">10<span class="unit">/10</span></div>
-        <div class="kpi-target"><span class="vs">target</span> <span class="tgt">≥ 9/10</span> · 0 collisions, 12&thinsp;s wall</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- MISSION -->
-  <section id="mission" class="reveal">
-    <div class="section-num">§ 03 — End-to-End Mission</div>
-    <h2 class="section-title">A full pass, <em>autonomously</em>.</h2>
-    <p class="section-intro">
-      Cold boot at the field edge. Localize. Pick the next priority row.
-      Plan over the SLAM cost map, inflated by predicted worker positions.
-      Drive. Inspect. Repeat — within battery and daylight budgets.
-    </p>
-
-    <div class="demo">
-      <div class="vis-header" style="margin-bottom:14px;">
-        <span>mission_trace.gif &nbsp;·&nbsp; seed = 7 &nbsp;·&nbsp; 8 rows × 14 trees</span>
-        <span class="live">REPRODUCIBLE</span>
-      </div>
-      <div class="demo-frame">
-        <img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/mission_trace.gif"
-             alt="Animated trace of the TerraScout rover completing a full orchard inspection pass"
-             loading="lazy" />
-      </div>
-      <div class="demo-caption">
-        <div>$&nbsp; python -m terrascout.runner.reproduce --skip-gif</div>
-        <div class="right">writes traces, PNGs, metric CSVs, benchmark CSVs, and reproduce_summary.json</div>
-      </div>
-    </div>
-
-    <!-- Milestones -->
-    <h3 style="font-family:'Instrument Serif',serif; font-size:32px; font-weight:400; margin:80px 0 12px; color:var(--ink-strong); letter-spacing:-0.01em;">
-      Six milestones, <em style="color:var(--amber); font-style:italic;">six demos</em>.
-    </h3>
-    <p style="max-width:680px; color:var(--ink); font-size:17px;">
-      Twelve weeks, six two-week milestones, each gated on green CI before the next began.
-    </p>
-
-    <div class="milestones">
-      <div class="ms">
-        <div class="ms-id">M1 · Weeks 1–2</div>
-        <h4 class="ms-title">Simulator + Drive Controller</h4>
-        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m1_control.gif" alt="PID tracking square and figure-eight" loading="lazy"/></div>
-        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m1_control.gif" target="_blank" rel="noopener">PID tracking demo</a>
-      </div>
-      <div class="ms">
-        <div class="ms-id">M2 · Weeks 3–4</div>
-        <h4 class="ms-title">Kalman Worker Tracker</h4>
-        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m2_tracker.gif" alt="Kalman tracker overlay" loading="lazy"/></div>
-        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m2_tracker.gif" target="_blank" rel="noopener">Tracker overlay</a>
-      </div>
-      <div class="ms">
-        <div class="ms-id">M3 · Weeks 5–6</div>
-        <h4 class="ms-title">Monte-Carlo Localizer</h4>
-        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m3_mcl.gif" alt="Particle cloud convergence" loading="lazy"/></div>
-        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m3_mcl.gif" target="_blank" rel="noopener">Particle convergence</a>
-      </div>
-      <div class="ms">
-        <div class="ms-id">M4 · Weeks 7–8</div>
-        <h4 class="ms-title">Pose-Graph EKF-SLAM</h4>
-        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m4_slam_overlay.gif" alt="Estimated trunks vs ground truth" loading="lazy"/></div>
-        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m4_slam_overlay.gif" target="_blank" rel="noopener">Map overlay</a>
-      </div>
-      <div class="ms">
-        <div class="ms-id">M5 · Weeks 9–10</div>
-        <h4 class="ms-title">Hybrid A* Planner</h4>
-        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m5_planner_comparison.gif" alt="Grid A* vs Hybrid A*" loading="lazy"/></div>
-        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m5_planner_comparison.gif" target="_blank" rel="noopener">Path comparison</a>
-      </div>
-      <div class="ms">
-        <div class="ms-id">M6 · Weeks 11–12</div>
-        <h4 class="ms-title">MDP + End-to-End</h4>
-        <div class="ms-thumb"><img src="https://github.com/KazmirFahrier/terrascout/raw/main/docs/milestones/m6_final_mission.gif" alt="30-row orchard priority pass" loading="lazy"/></div>
-        <a class="ms-link" href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/milestones/m6_final_mission.gif" target="_blank" rel="noopener">Final mission</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- ENGINEERING -->
-  <section id="engineering" class="reveal">
-    <div class="section-num">§ 04 — Engineering Practice</div>
-    <h2 class="section-title">Reproducible by <em>one command</em>.</h2>
-
-    <div class="eng">
-      <ul class="eng-list">
-        <li><span class="check">✓</span><span class="lbl">Language</span><span class="val"><strong>Python 3.11+</strong> · 100% Python</span></li>
-        <li><span class="check">✓</span><span class="lbl">Tests</span><span class="val"><strong>pytest + unittest</strong> · per-layer suites</span></li>
-        <li><span class="check">✓</span><span class="lbl">Coverage</span><span class="val"><strong>90%+</strong> measured coverage · 80% minimum gate</span></li>
-        <li><span class="check">✓</span><span class="lbl">CI</span><span class="val"><strong>GitHub Actions</strong> · ruff · mypy · pytest</span></li>
-        <li><span class="check">✓</span><span class="lbl">Reproducibility</span><span class="val"><strong>Seedable</strong> · scenario JSONs · deterministic CSVs</span></li>
-        <li><span class="check">✓</span><span class="lbl">Docs</span><span class="val"><strong>Per-module derivation PDFs</strong> · one-pager · KPI auto-update</span></li>
-        <li><span class="check">✓</span><span class="lbl">Originality</span><span class="val"><strong>Clean-room</strong> · MIT licensed</span></li>
-      </ul>
-
-      <blockquote class="eng-quote">
-        Numbers — not adjectives — are what make this credible to a hiring manager.
-        Every module ships with a benchmark script that emits a CSV.
-        <div class="who">— project README</div>
-      </blockquote>
-    </div>
-  </section>
-
-  <!-- RESUME-READY -->
-  <section id="resume" class="reveal">
-    <div class="section-num">§ 05 — Recruiter-Ready Summary</div>
-    <h2 class="section-title">Drop straight onto the <em>resume</em>.</h2>
-
-    <div class="resume">
-      <p class="resume-headline" id="headlineLine">
-        TerraScout — Built a six-layer autonomy stack
-        (PID → Kalman → MCL → Pose-Graph EKF-SLAM → Hybrid A* → MDP)
-        for a simulated GPS-degraded crop-inspection rover; <em>completed 10/10 priority rows
-        with 0.201 m mean pose error in 12 s wall-clock</em> across 20 randomized 30-row missions.
-      </p>
-
-      <ul class="resume-bullets" id="bulletsList">
-        <li>Architected and implemented a <strong>six-layer Python autonomy stack</strong> for a simulated differential-drive crop-inspection rover, integrating PID drive control, Kalman-filter worker tracking, particle-filter localization, pose-graph EKF-SLAM, Hybrid A* kinematic planning, and MDP inspection scheduling — all behind clean module APIs.</li>
-        <li>Designed a Kalman-filter tracker for up to 10 simultaneous moving agents from lidar clusters; achieved <span class="num">0.037 m</span> mean 1-second-ahead prediction error and <span class="num">100%</span> data-association accuracy across 100 simulated scenes.</li>
-        <li>Implemented an <strong>adaptive Monte-Carlo localizer</strong> with KLD resampling that converges from a ±5 m / ±30° prior to <span class="num">0.029 m p95</span> pose error using ≤ 169 particles — a 5.2× margin over the 3,000-particle, 0.15 m target.</li>
-        <li>Built a pose-graph <strong>EKF-SLAM</strong> module with Mahalanobis-gated data association on lidar-detected tree trunks; achieved <span class="num">0.032 m</span> drift-corrected pose and <span class="num">0.070 m</span> landmark error after 5-minute traversals across procedurally generated 12×30-row orchards.</li>
-        <li>Developed a <strong>Hybrid A* planner</strong> with bounded-curvature analytic connectors on a SLAM cost map inflated by Kalman-predicted worker positions; cut total steering effort by <span class="num">86.6%</span> vs. baseline grid A* with mean solve time <span class="num">28.5 ms</span>.</li>
-        <li>Solved orchard inspection scheduling as an <strong>MDP via value iteration</strong> over battery-SOC and time-of-day state; computed policy reaches the oracle exactly (<span class="num">0.00%</span> gap) across 50 randomized layouts under battery + daylight constraints.</li>
-        <li>Engineered a reproducible benchmark + CI pipeline (ruff, mypy --strict, pytest, <span class="num">90%+</span> coverage) that validates the project README against regenerated benchmark results on every push to <code style="font-family:'JetBrains Mono',monospace;">main</code>.</li>
-      </ul>
-
-      <div class="copy-row">
-        <button class="copy-btn" id="copyHeadline">Copy headline</button>
-        <button class="copy-btn" id="copyAll">Copy all bullets</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- ABOUT -->
-  <section id="about" class="reveal">
-    <div class="section-num">§ 06 — About</div>
-    <h2 class="section-title">Built by <em>Kazmir Fahrier</em>.</h2>
-
-    <div class="about">
-      <div class="about-text">
-        <p>
-          A self-directed twelve-week capstone designed to demonstrate full-stack autonomy
-          competence for robotics and ML engineering roles. The project pulls from foundational
-          textbook techniques — Probabilistic Robotics (Thrun, Burgard &amp; Fox), Planning
-          Algorithms (LaValle), Feedback Systems (Åström &amp; Murray), Sutton &amp; Barto —
-          and integrates them into one runnable, reproducible, end-to-end stack.
-        </p>
-        <p>
-          Every line is clean-room original code. No course-provided starter, simulator, test
-          fixtures, or assets. The vehicle class (skid-steer ground rover) and domain
-          (precision agriculture / GPS-degraded orchard inspection) were chosen specifically to
-          keep the work independent of any prior coursework.
-        </p>
-        <p>
-          Author background: BSc Electrical &amp; Electronic Engineering (BUET, US-equivalency
-          credentialed), Georgia Tech OMSCS in progress, hands-on AI evaluation work as an AI
-          trainer with deep coverage of analog/digital circuits, control systems, and
-          communications.
-        </p>
-      </div>
-
-      <aside class="contact-card">
-        <div class="contact-name">Kazmir Fahrier</div>
-        <div class="contact-role">Robotics · ML · Hardware/Software</div>
-        <ul class="contact-list">
-          <li><span>GitHub</span><a href="https://github.com/KazmirFahrier" target="_blank" rel="noopener">@KazmirFahrier ↗</a></li>
-          <li><span>LinkedIn</span><a href="https://www.linkedin.com/in/kazmir-fahrier" target="_blank" rel="noopener">/in/kazmir-fahrier ↗</a></li>
-          <li><span>Repository</span><a href="https://github.com/KazmirFahrier/terrascout" target="_blank" rel="noopener">/terrascout ↗</a></li>
-          <li><span>One-Pager</span><a href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/PROJECT_ONE_PAGER.pdf" target="_blank" rel="noopener">PDF ↗</a></li>
-        </ul>
-      </aside>
-    </div>
-  </section>
-
-  <footer>
-    <div class="foot-inner">
-      <div>© 2026 Kazmir Fahrier · MIT License · Clean-room original</div>
-      <div class="eof">— EOF —</div>
-    </div>
-  </footer>
-
-</div>
-
-<script>
-  // Reveal-on-scroll
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
-    });
-  }, { threshold: 0.08, rootMargin: '0px 0px -60px 0px' });
-  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-
-  // Copy buttons
-  function flash(btn, text) {
-    const orig = btn.textContent;
-    btn.textContent = text || 'Copied ✓';
-    btn.classList.add('done');
-    setTimeout(() => { btn.textContent = orig; btn.classList.remove('done'); }, 1600);
-  }
-  function plainText(node) {
-    return node.innerText.replace(/\s+/g, ' ').trim();
-  }
-  document.getElementById('copyHeadline').addEventListener('click', async () => {
-    const t = plainText(document.getElementById('headlineLine'));
-    try { await navigator.clipboard.writeText(t); flash(event.currentTarget); }
-    catch(e) { flash(event.currentTarget, 'Press ⌘C'); }
-  });
-  document.getElementById('copyAll').addEventListener('click', async (event) => {
-    const items = Array.from(document.querySelectorAll('#bulletsList li'))
-      .map(li => '• ' + plainText(li));
-    const text = plainText(document.getElementById('headlineLine')) + '\n\n' + items.join('\n\n');
-    try { await navigator.clipboard.writeText(text); flash(event.currentTarget); }
-    catch(e) { flash(event.currentTarget, 'Press ⌘C'); }
-  });
-</script>
-
+  <div class="hero-cta">
+    <a class="btn primary" href="https://github.com/KazmirFahrier/terrascout">Source and measured results ↗</a>
+    <a class="btn" href="docs/PROJECT_ONE_PAGER.pdf">Project summary PDF</a>
+    <a class="btn" href="https://github.com/KazmirFahrier/terrascout/actions">Validation runs</a>
+  </div>
+</header>
+<section id="system" style="padding:48px 0">
+  <h2 class="section-title">From observations to <em>executed motion</em>.</h2>
+  <p class="lede">One local observation frame supplies localization, tracking, and mapping. The selected pose estimate drives the rover. Simulated encoders and IMU yaw rate provide motion estimates.</p>
+  <div class="meta-row">
+    <div class="meta-cell"><div class="meta-label">Planning</div><p>Grid A* and geometric Hybrid A* with obstacle inflation, checked segments, explicit path failures, and a grid fallback.</p></div>
+    <div class="meta-cell"><div class="meta-label">Control</div><p>Measured speed feedback, rotation before translation, checked lookahead, and command supervision near perceived workers.</p></div>
+    <div class="meta-cell"><div class="meta-label">Resources</div><p>Priority goal scheduling with separate runtime distance, daylight, and modeled energy accounting.</p></div>
+  </div>
+</section>
+<section id="evidence" style="padding:48px 0">
+  <h2 class="section-title">Results with a <em>defined protocol</em>.</h2>
+  <p class="lede">The README reports the archived reference run and explains every denominator. Fresh CI runs retain CSVs, traces, environment versions, and source provenance. Incomplete missions and collisions remain visible in the results.</p>
+  <p><a href="https://github.com/KazmirFahrier/terrascout#recorded-results">Read measured results ↗</a> · <a href="https://github.com/KazmirFahrier/terrascout/blob/main/docs/VALIDATION.md">Review the audit repairs ↗</a></p>
+  <figure style="margin:32px 0"><img src="docs/mission_trace.png" alt="Recorded synthetic orchard goal service trajectory" style="width:100%;max-width:900px;border-radius:12px"><figcaption>Recorded simulation trajectory. Reaching a goal endpoint does not demonstrate crop inspection or full row coverage.</figcaption></figure>
+</section>
+<section id="scope" style="padding:48px 0">
+  <h2 class="section-title">Engineering scope and <em>remaining work</em>.</h2>
+  <p class="lede">This is a software portfolio project with synthetic measurements and a known tree map. Raw lidar scans and a RANSAC trunk detector are separately tested components. The mission currently uses labeled centroids with ideal object classes and no occlusion model.</p>
+  <p>Physical sensor calibration, actuator integration, crop sensing, field accuracy, and certified human safety have not been validated. A stopped rover can still be struck by an independent worker. Such contact is recorded as a failed mission.</p>
+  <p>Next steps are raw scan perception, detection failure experiments, worker encounter recovery, and calibrated hardware validation.</p>
+</section>
+<section style="padding:48px 0">
+  <h2 class="section-title">Reproduce the <em>experiment</em>.</h2>
+  <pre style="overflow:auto;padding:24px;border:1px solid #344339;border-radius:12px"><code>python -m pip install -e ".[dev]" -c constraints-ci.txt
+terrascout-reproduce --skip-gif
+python -m pytest
+python -m pytest -m performance --no-cov</code></pre>
+  <p>CI validates Python 3.11 and 3.12 and exercises a wheel installed outside the source checkout.</p>
+</section>
+<footer style="padding:48px 0;border-top:1px solid #344339">Built by <a href="https://github.com/KazmirFahrier">Kazmir Fahrier</a> · <a href="https://github.com/KazmirFahrier/terrascout">Repository</a> · MIT License</footer>
+</main>
 </body>
 </html>

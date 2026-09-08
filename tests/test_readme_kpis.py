@@ -27,6 +27,7 @@ class ReadmeKpiTest(unittest.TestCase):
                 "scheduler_max_optimality_gap_percent": 0.0,
                 "scheduler_max_wall_time_ms": 20.0,
                 "resource_scheduler_max_wall_time_ms": 30.0,
+                "resource_scheduler_max_optimality_gap_percent": 0.0,
                 "end_to_end_priority_goals": 10,
                 "end_to_end_total_collisions": 0,
                 "end_to_end_mean_pose_error_m": 0.201,
@@ -51,6 +52,10 @@ class ReadmeKpiTest(unittest.TestCase):
         updated = self.block()
         self.assertNotEqual(updated, original)
         self.assertIn("budget missed solve time", updated)
+
+    def test_requested_goals_are_not_reported_as_completed_goals(self) -> None:
+        self.summary["benchmark_summary"]["end_to_end_min_completed_goals"] = 6
+        self.assertIn("6/10 minimum completed goals", self.block())
 
     def test_collision_regression_changes_block(self) -> None:
         original = self.block()

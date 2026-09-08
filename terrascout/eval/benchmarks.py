@@ -66,6 +66,8 @@ class TrackingBenchmarkRow:
     mean_prediction_error_m: float
     association_accuracy: float
     wall_time_ms: float
+    detection_recall: float = 0.0
+    prediction_samples: int = 0
 
 
 @dataclass(frozen=True)
@@ -118,6 +120,9 @@ class EndToEndBenchmarkRow:
     mean_localization_error_m: float
     scheduler_dropped_goals: int
     replans: int
+    pose_source: str = "particle"
+    status: str = "not_started"
+    scheduled_goals: int = 0
 
 
 @dataclass(frozen=True)
@@ -252,7 +257,7 @@ def run_planner_benchmark(
                 planner="hybrid_astar",
                 waypoint_count=len(hybrid_path),
                 path_length_m=_point_length(hybrid_path),
-                steering_effort_rad=_pose_steering_effort(hybrid_path),
+                steering_effort_rad=_point_steering_effort([Point2D(p.x, p.y) for p in hybrid_path], start.theta),
                 wall_time_ms=(perf_counter() - started) * 1000.0,
             )
         )
@@ -268,7 +273,7 @@ def run_slam_benchmark(
     """Run 5-minute EKF-SLAM traversals across 12x30 orchard layouts."""
 
     rows: list[SlamBenchmarkRow] = []
-    dt = 0.75
+    dt = 0.05
     steps = int(300.0 / dt)
     for seed in list(seeds or SLAM_ACCEPTANCE_SEEDS):
         world = OrchardWorld(ScenarioConfig(rows=12, trees_per_row=30, worker_count=0, random_seed=seed))
@@ -283,7 +288,7 @@ def run_slam_benchmark(
         waypoints = _slam_acceptance_waypoints(world)
         waypoint_index = 0
         started = perf_counter()
-        for _ in range(steps):
+        for tick in range(steps):
             waypoint = waypoints[waypoint_index]
             if distance(rover.pose, waypoint) < 0.8 and waypoint_index < len(waypoints) - 1:
                 waypoint_index += 1
@@ -294,7 +299,8 @@ def run_slam_benchmark(
             rover.command(left, right)
             rover.step(dt)
             slam.predict(linear_mps=linear_mps, angular_rps=angular_rps, dt=dt)
-            slam.update(world.local_lidar_detections(rover.pose, include_workers=False))
+            if tick % 15 == 0:
+                slam.update(world.local_lidar_detections(rover.pose, include_workers=False))
         mean_observations = (
             sum(slam.landmark_observations) / len(slam.landmark_observations)
             if slam.landmark_observations
@@ -354,6 +360,7 @@ def run_tracking_benchmark(
         truth_to_track: dict[int, int] = {}
         correct_associations = 0
         total_associations = 0
+        matched_observations = expected_observations = 0
         prediction_errors: list[float] = []
 
         for step in range(steps):
@@ -361,11 +368,13 @@ def run_tracking_benchmark(
             tracker.update(detections, dt)
             assignments = _assign_tracks_to_truths(tracker, positions, max_distance_m=0.75)
             if step >= 10:
+                expected_observations += worker_count
+                total_associations += len(truth_to_track)
+                matched_observations += len(assignments)
                 future_positions = positions + velocities * 1.0
                 predictions = {track_id: np.array([x, y]) for track_id, x, y in tracker.predicted_positions(1.0)}
                 for truth_id, track_id in assignments.items():
                     if truth_id in truth_to_track:
-                        total_associations += 1
                         correct_associations += int(truth_to_track[truth_id] == track_id)
                     else:
                         truth_to_track[truth_id] = track_id
@@ -373,6 +382,8 @@ def run_tracking_benchmark(
                         prediction_errors.append(
                             float(np.linalg.norm(predictions[track_id] - future_positions[truth_id]))
                         )
+            else:
+                truth_to_track.update(assignments)
             positions = _advance_workers(positions, velocities, dt)
 
         rows.append(
@@ -384,6 +395,8 @@ def run_tracking_benchmark(
                 association_accuracy=(
                     correct_associations / total_associations if total_associations else 0.0
                 ),
+                detection_recall=matched_observations / expected_observations if expected_observations else 0.0,
+                prediction_samples=len(prediction_errors),
                 wall_time_ms=(perf_counter() - started) * 1000.0,
             )
         )
@@ -423,7 +436,7 @@ def run_localization_benchmark(
         detections = world.local_lidar_detections(truth, include_workers=False)
         localizer.scan_match_reset(detections, world.trees)
         for _ in range(5):
-            localizer.update(detections, world.trees)
+            localizer.update(world.local_lidar_detections(truth, include_workers=False), world.trees)
 
         rows.append(
             LocalizationBenchmarkRow(
@@ -620,6 +633,9 @@ def run_end_to_end_benchmark(
                 mean_localization_error_m=metrics.mean_localization_error_m,
                 scheduler_dropped_goals=metrics.scheduler_dropped_goals,
                 replans=metrics.replans,
+                pose_source=metrics.pose_source,
+                status=metrics.status,
+                scheduled_goals=metrics.scheduled_goals,
             )
         )
 

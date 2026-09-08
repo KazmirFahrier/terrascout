@@ -2,215 +2,127 @@
 
 [![CI](https://github.com/KazmirFahrier/terrascout/actions/workflows/ci.yml/badge.svg)](https://github.com/KazmirFahrier/terrascout/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
-![Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-TerraScout is a compact autonomy demo for a simulated crop-inspection rover in a GPS-degraded orchard. It was scoped for a short creator-challenge build: make the rover actually move, inspect rows, avoid obvious hazards, emit metrics, and leave a clean path for deeper robotics modules later.
+A reproducible orchard autonomy simulation by **Kazmir Fahrier**. TerraScout connects localization, worker tracking, path planning, scheduling, and rover control, with independent evaluation of executed motion.
 
-![TerraScout orchard inspection animation](docs/mission_trace.gif)
+The default mission navigates using a particle filter. It services selected goal locations in a known synthetic orchard. This is a robotics software portfolio project: no physical rover, field accuracy, crop sensing, electrical hardware, or production safety certification has been validated.
 
-## What Works Today
+![Recorded simulated rover trajectory](docs/mission_trace.png)
 
-- Procedural orchard generation with tree landmarks and moving field workers.
-- Differential-drive rover dynamics with wheel-speed saturation and slip.
-- Twin-loop PID waypoint tracking.
-- Lidar-style noisy cluster detections plus 270-degree / 0.5-degree scan frames.
-- IMU yaw-rate and wheel-encoder tick samples for the simulator sensor frame.
-- Constant-velocity Kalman tracking for moving worker detections.
-- KLD-adaptive particle-filter localization with coarse-to-fine lidar scan matching from a +/-5 m, +/-30 degree pose prior.
-- Online Gaussian tree-landmark mapping from local range/bearing detections.
-- Lidar tree-trunk detector with scan clustering and deterministic RANSAC circle fitting.
-- Compact EKF-SLAM back end with state expansion, covariance propagation, Mahalanobis-gated association, and range/bearing updates.
-- Grid A* path planning over inflated tree and worker obstacles.
-- Hybrid A* planning over a coarse `(x, y, theta)` lattice with forward/reverse arc primitives and an analytic bounded-curvature connector.
-- Resource-aware inspection scheduler over row priority, travel cost, battery, and daylight budgets.
-- Battery state-of-charge model with recharge-station contact telemetry.
-- Runtime safety supervisor that scales wheel commands near perceived or predicted workers.
-- End-to-end row-inspection mission runner with deterministic metrics.
-- Static PNG and animated GIF rendering for mission traces.
-- Benchmark CSV generation, unit tests, and GitHub Actions CI.
+## Run it
 
-This is a simulation-first autonomy stack, not a finished field robot. The default mission uses ground-truth pose for the most stable demo path, but estimated-pose control is available with `--pose-source particle` or `--pose-source slam`. Hybrid A* is available with `--planner hybrid`.
-
-## Quick Start
-
-Use Python 3.11 or newer. CI runs on Python 3.11, and mypy uses the active
-interpreter version when checking installed NumPy and Matplotlib stubs.
+Python 3.11 and 3.12 are tested in CI. The constraints file pins the tested dependency set.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-python -m terrascout.runner.reproduce --skip-gif
+python -m pip install -e ".[dev]" -c constraints-ci.txt
+terrascout-demo --trace artifacts/mission_trace.json
+terrascout-reproduce --skip-gif
 ```
 
-That one command writes the demo trace, PNG, metrics CSVs, benchmark CSVs, stress-test outputs, and `artifacts/reproduce_summary.json`. To also regenerate the animated GIF, omit `--skip-gif`.
-
-Useful individual commands:
+The reproduction writes traces, CSV measurements, a PNG, and `artifacts/reproduce_summary.json`. The summary records Python and library versions, the Git revision, whether the checkout was modified, and a hash of the Python source. CI retains its own results as downloadable workflow artifacts for 14 days.
 
 ```bash
-python -m terrascout.runner.mission --seed 7 --trace artifacts/mission_trace.json
-python -m terrascout.runner.mission --scenario scenarios/default_orchard.json --trace artifacts/scenario_trace.json
-python -m terrascout.runner.mission --seed 7 --planner hybrid --trace artifacts/hybrid_trace.json
-python -m terrascout.runner.mission --seed 7 --pose-source particle --trace artifacts/particle_trace.json
-python -m terrascout.runner.mission --rows 30 --max-goals 10 --battery-budget-m 700 --daylight-budget-s 900 --trace artifacts/large_trace.json
-python -m terrascout.viz.render --trace artifacts/mission_trace.json --out artifacts/mission_trace.png --gif artifacts/mission_trace.gif
-python benchmarks/run_benchmark.py
-python benchmarks/control_benchmark.py
-python benchmarks/tracking_benchmark.py
-python benchmarks/localization_benchmark.py
-python benchmarks/scheduler_benchmark.py
-python benchmarks/resource_scheduler_benchmark.py
-python benchmarks/planner_benchmark.py
-python benchmarks/slam_benchmark.py
-python benchmarks/end_to_end_benchmark.py
-python benchmarks/stress_benchmark.py
-python docs/design/render_design_pdfs.py
-python docs/render_project_one_pager_pdf.py
-python docs/render_milestone_demos.py
-python docs/update_readme_kpis.py --check
+terrascout-demo --planner hybrid --pose-source particle
+terrascout-demo --pose-source slam
+terrascout-demo --pose-source truth
+terrascout-demo --rows 30 --max-goals 10 --battery-budget-m 700 --daylight-budget-s 900
+terrascout-demo --scenario scenarios/default_orchard.json
 python -m pytest
 python -m pytest -m performance --no-cov
 ```
 
-The default test run measures coverage for functional checks. Run the performance
-marker separately without coverage instrumentation to check the five second
-mission runtime budget for both grid and hybrid planners. CI runs both commands.
+`truth` is an explicit diagnostic baseline. The geometric Hybrid A* option can fall back to grid A*. It does not guarantee final heading or bounded curvature throughout the returned path.
 
-If `pytest` is not installed, the tests also run with the standard library:
+## Implemented behavior
 
-```bash
-python -m unittest discover -s tests
-```
+* A differential drive simulator applies wheel saturation and slip, with circular rover and obstacle footprints.
+* A particle filter and EKF SLAM consume local observations and motion estimates from simulated encoders and IMU yaw rate. The selected estimator drives navigation and supplies the reported navigation error.
+* The tracker and landmark mapper receive the same local observation frame transformed through the selected navigation pose.
+* Grid A* rejects blocked routes and diagonal corner cutting. Both planners validate intermediate segments, endpoint connections, obstacle inflation, and orchard boundaries.
+* The follower turns before translating and checks its lookahead against the known map. The command supervisor slows or stops for perceived workers and rejects missing or stale observation metadata.
+* Workers move independently of the rover. Their random motion stream is separate from sensor sampling. An optional cooperative worker model remains available for separate experiments but is not used by missions.
+* An evaluator checks swept rover motion against trees, moving workers, and boundaries. Contact terminates the mission and is reported by obstacle type.
+* The scheduler predicts feasible goal subsets. Execution separately enforces distance, daylight, and modeled energy limits. Service requires two simulated seconds at a goal.
 
-## Current Benchmark
+## Recorded results
 
-The table below records an earlier local reference run with 8 tree rows, 7 inspection lanes, 14 trees per row, and one moving worker. Timings depend on hardware; each reproduction writes fresh measurements to the benchmark outputs.
-
-| Seeds | Pose source | Mean inspection success | Collision events | Mean localization error | Final SOC | Mean wall time |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| 2, 3, 5, 7, 11 | truth | 100% | 0 | ~0.19 m | ~90% | ~3.2 s |
-| 20-seed 30-row acceptance | truth | 100% | 0 | 0.201 m | n/a | 10.5 s |
+The following snapshot comes from [the archived reference summary](docs/validation/reference_summary.json). It is a local simulation measurement, not a field result. Fresh CI results can differ and are retained separately. Run `python docs/update_readme_kpis.py --summary docs/validation/reference_summary.json --check` to check that this table matches the archive.
 
 <!-- TERRASCOUT_KPI_START -->
-Layer KPI snapshot from the current reproducible benchmark suite:
+Recorded simulation results. See the protocol and limitations below.
 
-| Layer | Acceptance target | Current result |
-| --- | --- | ---: |
-| L1 Kalman tracker | <0.20 m 1-second prediction error; >=95% association | 0.037 m mean; 100% association across 100 scenes |
-| L2 particle filter | <0.15 m p95 pose error; <=3,000 particles | 0.029 m p95; <=169 particles across 10 wide-prior runs |
-| L3 EKF-SLAM | <0.20 m pose error; <0.30 m landmark error | 0.032 m mean pose; 0.070 m mean landmarks; 160 landmarks |
-| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | budget met solve time; 86.6% steering reduction |
-| L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | 0.000% gap; budget met unconstrained; budget met resource-aware |
-| 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | 10/10 goals; 0 collisions; 0.201 m mean pose; budget met wall time |
-| Default mission | 100% inspection success; no collisions | 100% success; 0 collisions |
+| Experiment | Measured result |
+| --- | --- |
+| Default mission (particle) | 100% requested goals serviced; 0 contacts |
+| Default suite, 5 seeds | 74% mean requested goal completion; 1 contacts |
+| 30 row priority trials | 19/20 runs completed all goals; 3/10 minimum completed goals; 1 contacts across 20 runs |
+| Moving mission localization | 0.064 m mean selected pose error |
+| Static relocalization, 10 poses | 0.023 m p95 final position error |
+| Constant velocity tracking, 100 scenes | 0.037 m mean matched prediction error; 100% ID continuity |
+| Standalone EKF SLAM traversal | 0.076 m mean final pose error; 0.209 m mean map error |
+| Planner geometry comparison | 0.0% Hybrid A* heading change reduction; budget met solve time (mean <=250 ms) |
+| Resource schedule versus exact oracle | 0.000% maximum objective gap |
 <!-- TERRASCOUT_KPI_END -->
 
-The managed table checks timing against the stated budgets because exact elapsed
-times vary by machine and load. Each reproduction saves its measured timings in
-the benchmark CSV files and `artifacts/reproduce_summary.json`.
+## What each measurement means
 
-Benchmark output is written to `artifacts/benchmark.csv`.
-
-L0 control benchmark output is written to `artifacts/control_benchmark.csv`. It evaluates 10 randomized slip/friction runs for straight-line cross-track error, 90-degree heading-settle time, and heading overshoot.
-
-L1 tracking benchmark output is written to `artifacts/tracking_benchmark.csv`. The benchmark evaluates 10 simultaneous moving workers across 100 deterministic scenes and reports 1-second prediction error plus ID-continuity association accuracy.
-
-L2 localization benchmark output is written to `artifacts/localization_benchmark.csv`. It evaluates particle-filter relocalization from a +/-5 m, +/-30 degree pose prior and reports prior error, mean/p95 final pose error, and particle count.
-
-L5 scheduler benchmark output is written to `artifacts/scheduler_benchmark.csv`. It compares the MDP value-iteration route with a brute-force permutation oracle and reports optimality gap, iterations, and wall time. Resource-aware scheduler output is written to `artifacts/resource_scheduler_benchmark.csv`; it compares battery/daylight constrained schedules against an exact constrained oracle across 50 randomized layouts.
-
-Reproducible scenario files live in `scenarios/`. They are plain JSON wrappers around `ScenarioConfig`, so benchmark scenes can be reviewed and versioned without changing Python code.
-
-Planner benchmark output is written to `artifacts/planner_benchmark.csv`. On the same local run, grid A* averaged ~9 ms per plan and Hybrid A* stayed under ~50 ms per plan while returning sparse heading-aware pose paths with >80% lower steering effort.
-
-SLAM benchmark output is written to `artifacts/slam_benchmark.csv`. The compact EKF-SLAM benchmark runs 5-minute traversals across ten 12x30 orchard layouts, observes up to 160 tree landmarks per layout, and reports final pose plus landmark-map error against ground truth. The scan-space tree-trunk detector lives in `terrascout/mapping/trunks.py` and is covered by unit tests against synthetic circles and full orchard lidar scans.
-
-End-to-end acceptance benchmark output is written to `artifacts/end_to_end_benchmark.csv`. It runs 20 randomized 30-row orchard priority passes with 10 scheduled high-priority inspection goals, one moving worker, explicit battery/daylight budgets, and reports success rate, collisions, wall time, localization error, scheduler drops, and replans. The recorded reference run completed all priority goals with zero collisions, 0.201 m mean pose error, and a 12.00 s maximum mission wall time.
-
-Stress benchmark output is written to `artifacts/stress_benchmark_summary.csv`. The current stress suite covers worker-present grid/truth and grid/particle modes plus clear-lane grid/SLAM and Hybrid A*/SLAM modes across seeds `2, 7, 11`; all four modes currently complete with 100% success and zero collisions.
-
-## Milestone Demos
-
-`python docs/render_milestone_demos.py` regenerates the portfolio demo artifacts below from the
-same simulator, estimators, planners, and mission runner used by the tests.
-
-| Milestone | Demo artifact |
+| Measurement | Protocol and limit |
 | --- | --- |
-| M1 Simulator + PID | ![PID square and figure-eight tracking](docs/milestones/m1_control.gif) |
-| M2 Kalman tracker | ![Kalman tracker ground truth and prediction overlay](docs/milestones/m2_tracker.gif) |
-| M3 Monte-Carlo localizer | ![Particle cloud convergence heat map](docs/milestones/m3_mcl.gif) |
-| M4 EKF-SLAM | ![Estimated tree landmarks over ground truth](docs/milestones/m4_slam_overlay.gif) |
-| M5 Hybrid A* planner | ![Grid A* and Hybrid A* path comparison](docs/milestones/m5_planner_comparison.gif) |
-| M6 MDP + end-to-end | ![30-row orchard priority pass](docs/milestones/m6_final_mission.gif) |
+| Mission completion | Completed goal services divided by all requested candidate goals, including those the scheduler drops. Zero requested or feasible goals never produces 100% success. |
+| `inspected_rows`, `total_rows` | Compatibility field names for serviced and requested goal counts. Reaching an endpoint does not establish row coverage or crop inspection. `scheduled_goals` reports the selected subset. |
+| Contacts | Continuous segment checks within each simulator tick, using a 0.45 m rover radius, 0.18 m tree radius, and each worker's body radius. `collisions` counts contact entries; `collision_frames` counts ticks with contact. |
+| Worker clearance | Minimum actual swept separation between body surfaces. A negative value means overlap; no workers produces JSON `null`. It is evaluated independently of sensor visibility. |
+| Navigation error | Mean position error of the selected pose source against simulator truth. Particle and SLAM errors are also reported separately. Benchmark summaries average the per run means. Truth mode correctly reports zero selected pose error. |
+| Resources | `battery_remaining_m` and `daylight_remaining_s` derive from executed motion and elapsed time. Fields prefixed `forecast_` are scheduler predictions based on straight line travel. There is no guaranteed return to a charger. |
+| Static localization | Ten stationary poses, a perturbed prior, exact landmark map, scan matching, and five fresh observation frames. The final position p95 is not a moving mission accuracy guarantee. |
+| Tracking | One hundred constant velocity scenes with ten workers. ID continuity penalizes missing established identities. Detection recall and matched prediction sample count accompany conditional prediction error. There is no occlusion or missed detection stress in this module benchmark. |
+| SLAM | A standalone 300 second traversal with ideal command odometry, known initial pose, 20 Hz control, and observations every 0.75 seconds. Mapping results are separate from mission navigation. |
+| Planning | Both planners use the same sum of geometric segment heading changes. This is not executed steering effort. Negative reduction means Hybrid A* performed worse. Failed paths have zero waypoints and must not be interpreted as fast successful plans. |
+| Scheduling | Comparison to an exact oracle for the same simplified straight line cost model. The exact search is capped at 12 candidate goals in missions; use `max_goals` for larger orchards. |
+| Timing | Wall time is machine dependent. The functional coverage run is separate from a 15 second local mission runtime guard. No real hardware control deadline has been measured. |
+
+The default benchmark uses seeds `2, 3, 5, 7, 11`. The larger experiment uses twenty seeds, thirty tree rows, ten requested priority goals, one independent worker, particle navigation, and explicit budgets. The stress suite also records truth and SLAM variants, including clear worker scenarios. The CSVs retain incomplete runs and collisions.
+
+## Sensor and map boundaries
+
+The mission consumes synthetic labeled range and bearing centroids with noise, range limits, and a 270 degree field of view. These observations have ideal object labels and do not model occlusion. The full ray scan generator and RANSAC trunk detector are separately tested modules; they are not wired into the mission perception chain. Worker detection from raw lidar remains future work.
+
+Particle localization and planning use the generated, known tree map. The mission does not plan from the reconstructed SLAM map. Estimators start from a supplied initial pose or nearby prior. IMU and encoder samples are synthetic and have no physical calibration evidence. Synchronous simulation frames are marked fresh; hardware timestamp transport and driver watchdog integration remain unimplemented.
+
+A stopped rover can still be struck by an independent worker. This simulator records such failures; command slowing is not a certified human safety system. Charging is available as a standalone battery model operation; mission runs no longer recharge merely by passing a station.
 
 ## Architecture
 
 ```mermaid
 flowchart LR
-  world["Orchard world<br/>trees, rows, workers"] --> sensors["Sensor frame<br/>lidar, IMU, encoders"]
-  sensors --> trunks["Trunk detector<br/>clustering + RANSAC"]
-  sensors --> tracker["L1 Kalman tracker<br/>worker predictions"]
-  sensors --> localizer["L2 MCL<br/>global pose belief"]
-  trunks --> slam["L3 EKF-SLAM<br/>pose + tree map"]
-  trunks --> localizer
-  tracker --> planner["L4 planner<br/>grid A* / Hybrid A*"]
-  slam --> planner
-  localizer --> runner["Mission runner<br/>pose-source switch"]
-  slam --> runner
-  scheduler["L5 resource scheduler<br/>priority + battery + daylight"] --> planner
-  planner --> controller["L0 PID controller<br/>wheel commands"]
-  tracker --> safety["Safety supervisor<br/>command scaling"]
-  controller --> safety
-  safety --> rover["Differential-drive rover"]
-  rover --> world
-  rover --> battery["Battery model<br/>SOC + recharge contact"]
-  battery --> scheduler
+  world[Simulation] --> local[Local labeled observations]
+  world --> odom[Encoder and IMU samples]
+  local --> estimates[Particle filter and EKF SLAM]
+  odom --> estimates
+  estimates --> nav[Selected pose]
+  local --> transform[Transform using selected pose]
+  nav --> transform
+  transform --> tracker[Worker tracker]
+  transform --> mapper[Landmark mapper]
+  known[Known tree map] --> estimates
+  known --> planner[Grid or Hybrid A*]
+  tracker --> planner
+  nav --> planner
+  scheduler[Resource schedule] --> planner
+  planner --> follower[Waypoint follower]
+  follower --> safety[Perception and known map guards]
+  tracker --> safety
+  safety --> rover[Rover dynamics]
+  rover --> evaluator[Independent swept contact evaluator]
+  world --> evaluator
+  evaluator --> metrics[Metrics and failure status]
 ```
 
-```text
-terrascout/
-  sim/        orchard world, rover kinematics, sensor detections
-  scenarios/  reproducible JSON scenario configs
-  control/    PID drive controller
-  tracking/   Kalman worker tracker
-  localize/   particle-filter localization
-  mapping/    trunk detector, online mapper, and compact EKF-SLAM
-  plan/       grid A* and Hybrid A* planners
-  scheduler/  value-iteration inspection scheduler
-  runner/     end-to-end mission loop
-  viz/        mission trace renderer
-```
+## Validation and documentation
 
-Runtime flow:
+[Repair notes and remaining limits](docs/VALIDATION.md) explain the audit fixes. [Design notes](docs/design/README.md) cover the component equations. The [project summary](docs/PROJECT_ONE_PAGER.md) also has a [PDF version](docs/PROJECT_ONE_PAGER.pdf).
 
-1. The world emits noisy lidar-style detections plus synchronized lidar scan, IMU, and encoder frames.
-2. The Kalman tracker updates worker tracks and predicts near-future positions.
-3. The scan clusterer and RANSAC circle fitter produce tree-trunk range/bearing detections.
-4. The KLD-adaptive particle filter estimates rover pose from local tree observations.
-5. The landmark mapper accumulates a tree map from range/bearing detections.
-6. The scheduler chooses the next inspection goal from travel cost, row priority, battery, and daylight budgets.
-7. The planner builds an inflated occupancy grid from trees and predicted workers.
-8. The PID controller proposes wheel commands from truth, particle-filter, or EKF-SLAM pose.
-9. The battery model consumes energy from motion/idle time and records recharge-station contact.
-10. The safety supervisor scales commands when perceived or predicted workers enter the safety envelope.
-11. The mission runner records inspection, collision, safety, battery, mapping, EKF-SLAM, localization, path-length, and timing metrics.
-
-Per-layer derivation notes live in [docs/design](docs/design/README.md). They cover the motion
-models, measurement models, update equations, pseudocode, acceptance benchmarks, and references
-for L0 through L5; `python docs/design/render_design_pdfs.py` regenerates PDF copies.
-
-## Roadmap
-
-- Stress-test estimated-pose control across larger randomized scenario suites.
-- Use Hybrid A* as the default mission planner after more stress testing.
-- Add a narrated demo video.
-
-## Why This Exists
-
-The goal is to show an end-to-end autonomy slice that is small enough to understand but complete enough to run: a simulated rover, sensors, tracking, planning, control, evaluation, and a reproducible public repo.
-
-For a reviewer-friendly summary, see [docs/PROJECT_ONE_PAGER.md](docs/PROJECT_ONE_PAGER.md)
-or the rendered [docs/PROJECT_ONE_PAGER.pdf](docs/PROJECT_ONE_PAGER.pdf). Regenerate the PDF
-with `python docs/render_project_one_pager_pdf.py`.
+CI checks lint, strict typing, functional coverage, elapsed mission time, a wheel installed outside the checkout, and the reproduction workflow. It retains results even when a check fails. The scripts in `benchmarks/` run individual experiments. `docs/render_milestone_demos.py` can regenerate component illustrations; archived component GIFs are illustrations, not current mission acceptance evidence.

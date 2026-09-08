@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import hashlib
 from pathlib import Path
 import sys
 
@@ -21,55 +22,23 @@ def build_kpi_block(summary_path: Path = SUMMARY) -> str:
     summary = json.loads(summary_path.read_text())
     benchmark = summary["benchmark_summary"]
     mission = summary["mission"]
-    return "\n".join(
-        [
-            START,
-            "Layer KPI snapshot from the current reproducible benchmark suite:",
-            "",
-            "| Layer | Acceptance target | Current result |",
-            "| --- | --- | ---: |",
-            (
-                "| L1 Kalman tracker | <0.20 m 1-second prediction error; >=95% association | "
-                f"{benchmark['tracking_mean_prediction_error_m']:.3f} m mean; "
-                f"{_percent(benchmark['tracking_mean_association_accuracy'])} association across 100 scenes |"
-            ),
-            (
-                "| L2 particle filter | <0.15 m p95 pose error; <=3,000 particles | "
-                f"{benchmark['localization_p95_pose_error_m']:.3f} m p95; "
-                f"<={_localization_max_particles(summary_path)} particles across 10 wide-prior runs |"
-            ),
-            (
-                "| L3 EKF-SLAM | <0.20 m pose error; <0.30 m landmark error | "
-                f"{benchmark['slam_mean_pose_error_m']:.3f} m mean pose; "
-                f"{benchmark['slam_mean_landmark_error_m']:.3f} m mean landmarks; "
-                f"{benchmark['slam_mean_landmarks']:.0f} landmarks |"
-            ),
-            (
-                "| L4 Hybrid A* | <=250 ms solve time; >=30% lower steering effort | "
-                f"{_budget_status(benchmark['planner_mean_wall_time_ms']['hybrid_astar'], 250.0)} solve time; "
-                f"{benchmark['planner_mean_steering_reduction_percent']:.1f}% steering reduction |"
-            ),
-            (
-                "| L5 MDP scheduler | <=5% oracle gap; <800 ms solve time | "
-                f"{benchmark['scheduler_max_optimality_gap_percent']:.3f}% gap; "
-                f"{_budget_status(benchmark['scheduler_max_wall_time_ms'], 800.0)} unconstrained; "
-                f"{_budget_status(benchmark['resource_scheduler_max_wall_time_ms'], 800.0)} resource-aware |"
-            ),
-            (
-                "| 30-row mission | >=9/10 priority goals; 0 collisions; <60 s wall time | "
-                f"{int(benchmark['end_to_end_priority_goals'])}/10 goals; "
-                f"{int(benchmark['end_to_end_total_collisions'])} collisions; "
-                f"{benchmark['end_to_end_mean_pose_error_m']:.3f} m mean pose; "
-                f"{_budget_status(benchmark['end_to_end_max_wall_time_s'], 60.0)} wall time |"
-            ),
-            (
-                "| Default mission | 100% inspection success; no collisions | "
-                f"{_percent(mission['success_rate'])} success; "
-                f"{int(mission['collisions'])} collisions |"
-            ),
-            END,
-        ]
-    )
+    return "\n".join([
+        START,
+        "Recorded simulation results. See the protocol and limitations below.",
+        "",
+        "| Experiment | Measured result |",
+        "| --- | --- |",
+        f"| Default mission ({mission.get('pose_source', 'unknown')}) | {_percent(mission['success_rate'])} requested goals serviced; {int(mission['collisions'])} contacts |",
+        f"| Default suite, {int(benchmark.get('mission_runs', 0))} seeds | {_percent(benchmark.get('mission_mean_success_rate', 0.0))} mean requested goal completion; {int(benchmark.get('mission_total_collisions', 0))} contacts |",
+        f"| 30 row priority trials | {int(benchmark.get('end_to_end_completed_runs', 0))}/{int(benchmark.get('end_to_end_runs', 0))} runs completed all goals; {int(benchmark.get('end_to_end_min_completed_goals', 0))}/{int(benchmark['end_to_end_priority_goals'])} minimum completed goals; {int(benchmark['end_to_end_total_collisions'])} contacts across {int(benchmark.get('end_to_end_runs', 0))} runs |",
+        f"| Moving mission localization | {benchmark['end_to_end_mean_pose_error_m']:.3f} m mean selected pose error |",
+        f"| Static relocalization, 10 poses | {benchmark['localization_p95_pose_error_m']:.3f} m p95 final position error |",
+        f"| Constant velocity tracking, 100 scenes | {benchmark['tracking_mean_prediction_error_m']:.3f} m mean matched prediction error; {_percent(benchmark['tracking_mean_association_accuracy'])} ID continuity |",
+        f"| Standalone EKF SLAM traversal | {benchmark['slam_mean_pose_error_m']:.3f} m mean final pose error; {benchmark['slam_mean_landmark_error_m']:.3f} m mean map error |",
+        f"| Planner geometry comparison | {benchmark['planner_mean_steering_reduction_percent']:.1f}% Hybrid A* heading change reduction; {_budget_status(benchmark['planner_mean_wall_time_ms']['hybrid_astar'], 250.0)} solve time (mean <=250 ms) |",
+        f"| Resource schedule versus exact oracle | {benchmark['resource_scheduler_max_optimality_gap_percent']:.3f}% maximum objective gap |",
+        END,
+    ])
 
 
 def update_readme(readme_path: Path = README, summary_path: Path = SUMMARY) -> str:
@@ -112,6 +81,16 @@ def main() -> None:
     updated = update_readme(args.readme, args.summary)
     current = args.readme.read_text()
     if args.check:
+        reference = json.loads(args.summary.read_text())
+        expected = reference.get("provenance", {}).get("source_sha256")
+        if expected:
+            fingerprint = hashlib.sha256()
+            for source in sorted((ROOT / "terrascout").rglob("*.py")):
+                fingerprint.update(str(source.relative_to(ROOT)).encode())
+                fingerprint.update(source.read_bytes())
+            if fingerprint.hexdigest() != expected:
+                print("Reference evidence is from different Python source; reproduce and refresh it", file=sys.stderr)
+                raise SystemExit(1)
         if updated != current:
             print("README KPI block is stale; run python docs/update_readme_kpis.py", file=sys.stderr)
             raise SystemExit(1)

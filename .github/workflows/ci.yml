@@ -4,22 +4,51 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.11"
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install -e ".[dev]"
+          python-version: ${{ matrix.python }}
+          cache: pip
+          cache-dependency-path: constraints-ci.txt
+      - run: python -m pip install -e ".[dev]" -c constraints-ci.txt
       - run: ruff check .
       - run: mypy terrascout
       - run: python -m pytest -m performance --no-cov
-      - run: python -m pytest
-      - run: python -m terrascout.runner.reproduce --skip-gif
-      - run: python docs/update_readme_kpis.py --check
-      - run: python docs/design/render_design_pdfs.py
-      - run: python docs/render_project_one_pager_pdf.py
-      - run: python docs/render_milestone_demos.py --still-only --output-dir artifacts/milestone_stills
+      - run: python -m pytest --junitxml=artifacts/tests.xml --cov-report=xml:artifacts/coverage.xml
+      - name: Build and exercise the installed wheel outside the checkout
+        shell: bash
+        run: |
+          python -m pip wheel . --no-deps --wheel-dir dist
+          python -m venv "$RUNNER_TEMP/terrascout-wheel"
+          "$RUNNER_TEMP/terrascout-wheel/bin/python" -m pip install dist/*.whl -c constraints-ci.txt
+          cd "$RUNNER_TEMP"
+          "$RUNNER_TEMP/terrascout-wheel/bin/python" -c 'from terrascout.runner.mission import run_mission; m = run_mission(rows=4, trees_per_row=4, worker_count=0, max_goals=1); assert m.status == "completed" and m.collisions == 0, m'
+      - run: python docs/update_readme_kpis.py --summary docs/validation/reference_summary.json --check
+      - name: Reproduce simulation benchmarks
+        if: matrix.python == '3.12'
+        run: python -m terrascout.runner.reproduce --skip-gif
+      - name: Render documentation
+        if: matrix.python == '3.12'
+        run: |
+          python docs/design/render_design_pdfs.py
+          python docs/render_project_one_pager_pdf.py
+          python docs/render_milestone_demos.py --still-only --output-dir artifacts/milestone_stills
+      - name: Retain test results and simulation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-python-${{ matrix.python }}
+          path: artifacts/
+          retention-days: 14

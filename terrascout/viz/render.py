@@ -20,11 +20,11 @@ def render_trace(trace_json: Path, output_png: Path, seed: int = 7) -> None:
     payload = json.loads(trace_json.read_text())
     poses = payload["trace"]["poses"]
     goals = payload["trace"]["goals"]
-    world = OrchardWorld(ScenarioConfig(random_seed=seed))
+    world = OrchardWorld(ScenarioConfig(**payload.get("scenario", {"random_seed": seed})))
 
     output_png.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(10, 8), dpi=140)
-    ax.set_title("TerraScout MVP orchard inspection trace")
+    ax.set_title("TerraScout simulated goal service trace")
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
     ax.set_aspect("equal", adjustable="box")
@@ -49,7 +49,7 @@ def render_animation(trace_json: Path, output_gif: Path, seed: int = 7, max_fram
     poses = payload["trace"]["poses"]
     goals = payload["trace"]["goals"]
     workers = payload["trace"]["workers"]
-    world = OrchardWorld(ScenarioConfig(random_seed=seed))
+    world = OrchardWorld(ScenarioConfig(**payload.get("scenario", {"random_seed": seed})))
     if not poses:
         raise ValueError("Trace has no poses to render")
 
@@ -58,7 +58,7 @@ def render_animation(trace_json: Path, output_gif: Path, seed: int = 7, max_fram
     frame_indices = list(range(0, len(poses), stride))
 
     fig, ax = plt.subplots(figsize=(7.5, 6.5), dpi=110)
-    ax.set_title("TerraScout orchard inspection")
+    ax.set_title("TerraScout simulated goal service")
     ax.set_xlabel("x [m]")
     ax.set_ylabel("y [m]")
     ax.set_aspect("equal", adjustable="box")
