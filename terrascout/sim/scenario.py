@@ -30,6 +30,7 @@ def load_scenario_config(path: Path) -> ScenarioConfig:
         width_margin_m=float(values.get("width_margin_m", ScenarioConfig.width_margin_m)),
         lidar_range_m=float(values.get("lidar_range_m", ScenarioConfig.lidar_range_m)),
         random_seed=int(values.get("random_seed", ScenarioConfig.random_seed)),
+        headland_m=float(values.get("headland_m", ScenarioConfig.headland_m)),
     )
 
 
@@ -43,6 +44,10 @@ def save_scenario_config(config: ScenarioConfig, path: Path) -> None:
 
 def _coerce_value(key: str, value: Any) -> int | float:
     integer_fields = {"rows", "trees_per_row", "worker_count", "random_seed"}
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{key} must be numeric")
     if key in integer_fields:
-        return int(value)
+        if not isinstance(value, int):
+            raise ValueError(f"{key} must be an integer")
+        return value
     return float(value)

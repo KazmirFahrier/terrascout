@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import hypot
+from math import hypot, isfinite
 
 from terrascout.sim.geometry import Point2D, Pose2D
 from terrascout.sim.world import LidarDetection
@@ -37,6 +37,7 @@ class SafetySupervisor:
         right_mps: float,
         worker_detections: list[LidarDetection],
         predicted_workers: list[tuple[int, float, float]],
+        observation_age_s: float | None = None,
     ) -> SafetyDecision:
         """Scale wheel commands based on perceived and predicted worker clearance."""
 
@@ -46,10 +47,17 @@ class SafetySupervisor:
             (hypot(point.x - pose.x, point.y - pose.y) for point in worker_points),
             default=float("inf"),
         )
-        scale = self._scale_for_clearance(min_clearance)
+        fresh = (
+            observation_age_s is not None
+            and isfinite(observation_age_s)
+            and 0.0 <= observation_age_s <= 0.25
+        )
+        valid = all(isfinite(value) for value in (pose.x, pose.y, pose.theta, left_mps, right_mps))
+        valid = valid and all(isfinite(point.x) and isfinite(point.y) for point in worker_points)
+        scale = self._scale_for_clearance(min_clearance) if fresh and valid else 0.0
         return SafetyDecision(
-            left_mps=left_mps * scale,
-            right_mps=right_mps * scale,
+            left_mps=left_mps * scale if scale else 0.0,
+            right_mps=right_mps * scale if scale else 0.0,
             scale=scale,
             min_clearance_m=min_clearance,
             intervened=scale < 0.999,

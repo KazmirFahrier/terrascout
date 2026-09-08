@@ -51,20 +51,30 @@ class HybridAStarPlanner:
         goal: Pose2D | Point2D,
         predicted_workers: Iterable[tuple[int, float, float]] = (),
     ) -> list[Pose2D]:
-        """Plan a kinematically feasible sequence of poses."""
+        """Return a checked pose polyline, with a grid fallback when search fails.
+
+        This is a geometric guide for a differential drive follower. Final heading
+        and bounded curvature are not guaranteed by the fallback or goal connector.
+        """
 
         goal_pose = goal if isinstance(goal, Pose2D) else Pose2D(goal.x, goal.y, 0.0)
+        predicted_workers = list(predicted_workers)
         blocked = self.grid_planner._occupancy_grid(predicted_workers)
+        if not self.grid_planner.segment_is_safe(
+            start, start, predicted_workers
+        ) or not self.grid_planner.segment_is_safe(goal_pose, goal_pose, predicted_workers):
+            return []
         direct = self._analytic_connector(start, goal_pose, blocked)
         if direct is not None:
             return direct
         start_key = self._key(start)
-        start_key = self._nearest_free_state(start_key, blocked)
+        if not self._is_free(start_key, blocked):
+            return self._grid_fallback(start, goal_pose, predicted_workers)
 
         open_set: list[tuple[float, int, tuple[int, int, int]]] = []
         heappush(open_set, (self._heuristic(start, goal_pose), 0, start_key))
         came_from: dict[tuple[int, int, int], tuple[int, int, int]] = {}
-        poses: dict[tuple[int, int, int], Pose2D] = {start_key: self._pose_from_key(start_key, start.theta)}
+        poses: dict[tuple[int, int, int], Pose2D] = {start_key: start}
         g_score: dict[tuple[int, int, int], float] = {start_key: 0.0}
         counter = 1
         expansions = 0
@@ -73,7 +83,9 @@ class HybridAStarPlanner:
             _, _, current_key = heappop(open_set)
             current_pose = poses[current_key]
             expansions += 1
-            if self._reached(current_pose, goal_pose):
+            if self._reached(current_pose, goal_pose) and self._connector_segment_free(
+                current_pose, goal_pose, blocked
+            ):
                 return self._reconstruct(came_from, poses, current_key, goal_pose)
             if hypot(goal_pose.x - current_pose.x, goal_pose.y - current_pose.y) <= (
                 self.config.analytic_expansion_distance_m
@@ -85,7 +97,9 @@ class HybridAStarPlanner:
 
             for next_pose, primitive_cost in self._expand(current_pose):
                 next_key = self._key(next_pose)
-                if not self._is_free(next_key, blocked):
+                if not self._is_free(next_key, blocked) or not self._connector_segment_free(
+                    current_pose, next_pose, blocked
+                ):
                     continue
                 tentative = g_score[current_key] + primitive_cost
                 if tentative >= g_score.get(next_key, float("inf")):
@@ -164,15 +178,21 @@ class HybridAStarPlanner:
         return self._sparsify(path)
 
     def _sparsify(self, path: list[Pose2D]) -> list[Pose2D]:
-        if len(path) <= 2:
+        # Only remove collinear points. Heading bin equality does not imply
+        # that the chord connecting two poses avoids obstacles.
+        if len(path) < 3:
             return path
         sparse = [path[0]]
-        last_heading_bin = self._key(path[0])[2]
-        for pose in path[1:-1]:
-            heading_bin = self._key(pose)[2]
-            if heading_bin != last_heading_bin:
-                sparse.append(pose)
-            last_heading_bin = heading_bin
+        for current, nxt in zip(path[1:-1], path[2:]):
+            previous = sparse[-1]
+            cross = (current.x - previous.x) * (nxt.y - current.y) - (current.y - previous.y) * (
+                nxt.x - current.x
+            )
+            dot = (current.x - previous.x) * (nxt.x - current.x) + (current.y - previous.y) * (
+                nxt.y - current.y
+            )
+            if abs(cross) > 1e-9 or dot < 0:
+                sparse.append(current)
         sparse.append(path[-1])
         return sparse
 
@@ -189,8 +209,6 @@ class HybridAStarPlanner:
             theta = atan2(point.y - prev.y, point.x - prev.x)
             poses.append(Pose2D(point.x, point.y, theta))
             prev = poses[-1]
-        if not poses or hypot(poses[-1].x - goal.x, poses[-1].y - goal.y) > 1e-6:
-            poses.append(goal)
         return poses
 
     def _analytic_connector(
@@ -260,13 +278,4 @@ class HybridAStarPlanner:
         end: Pose2D,
         blocked: NDArray[np.bool_],
     ) -> bool:
-        distance_m = hypot(end.x - start.x, end.y - start.y)
-        samples = max(1, int(distance_m / (0.5 * self.config.grid.resolution_m)))
-        for idx in range(samples + 1):
-            fraction = idx / samples
-            x = start.x + (end.x - start.x) * fraction
-            y = start.y + (end.y - start.y) * fraction
-            cell = self.grid_planner._to_cell(x, y)
-            if not self._is_free((cell[0], cell[1], 0), blocked):
-                return False
-        return True
+        return self.grid_planner.grid_segment_is_free(start, end, blocked)

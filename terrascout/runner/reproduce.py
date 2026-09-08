@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
+import hashlib
+from importlib.metadata import version
+import subprocess
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -89,9 +93,38 @@ def run_reproduce(
         stress_rows=stress_rows,
         outputs=outputs,
     )
+    source_root = Path(__file__).resolve().parents[2]
+    fingerprint = hashlib.sha256()
+    for source in sorted((source_root / "terrascout").rglob("*.py")):
+        fingerprint.update(str(source.relative_to(source_root)).encode())
+        fingerprint.update(source.read_bytes())
+    try:
+        revision = subprocess.check_output(
+            ["git", "-C", str(source_root), "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "-C", str(source_root), "status", "--porcelain"], text=True
+            ).strip()
+        )
+    except (OSError, subprocess.CalledProcessError):
+        revision, dirty = "unavailable", None
+    summary["provenance"] = {
+        "git_revision": revision,
+        "source_sha256": fingerprint.hexdigest(),
+        "working_tree_dirty": dirty,
+        "python": platform.python_version(),
+        "platform": platform.platform(),
+        "numpy": version("numpy"),
+        "matplotlib": version("matplotlib"),
+        "observation_model": mission.observation_model,
+        "worker_behavior": mission.worker_behavior,
+    }
     summary_path = artifacts_dir / "reproduce_summary.json"
     summary["outputs"]["reproduce_summary_json"] = str(summary_path)
-    summary_path.write_text(json.dumps(summary, indent=2))
+    summary_path.write_text(json.dumps(summary, indent=2, allow_nan=False))
     return summary
 
 
@@ -133,6 +166,9 @@ def build_reproduce_summary(
             ),
             "tracking_mean_prediction_error_m": _mean(
                 [row.mean_prediction_error_m for row in tracking_rows]
+            ),
+            "tracking_mean_detection_recall": _mean(
+                [row.detection_recall for row in tracking_rows]
             ),
             "tracking_mean_association_accuracy": _mean(
                 [row.association_accuracy for row in tracking_rows]
@@ -193,6 +229,11 @@ def build_reproduce_summary(
                 (row.success_rate for row in end_to_end_rows),
                 default=0.0,
             ),
+            "end_to_end_min_completed_goals": min(
+                (row.inspected_goals for row in end_to_end_rows), default=0
+            ),
+            "end_to_end_completed_runs": sum(row.status == "completed" for row in end_to_end_rows),
+            "end_to_end_pose_sources": sorted({row.pose_source for row in end_to_end_rows}),
             "end_to_end_total_collisions": sum(row.collisions for row in end_to_end_rows),
             "end_to_end_mean_pose_error_m": _mean(
                 [row.mean_localization_error_m for row in end_to_end_rows]
@@ -226,14 +267,18 @@ def _percentile(values: list[float], percentile_value: float) -> float:
 
 def _planner_steering_reduction(rows: list[PlannerBenchmarkRow]) -> float:
     grid_effort = _mean([row.steering_effort_rad for row in rows if row.planner == "grid_astar"])
-    hybrid_effort = _mean([row.steering_effort_rad for row in rows if row.planner == "hybrid_astar"])
+    hybrid_effort = _mean(
+        [row.steering_effort_rad for row in rows if row.planner == "hybrid_astar"]
+    )
     if grid_effort <= 0.0:
         return 0.0
-    return max(0.0, (grid_effort - hybrid_effort) / grid_effort * 100.0)
+    return (grid_effort - hybrid_effort) / grid_effort * 100.0
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Reproduce TerraScout demo artifacts and benchmarks.")
+    parser = argparse.ArgumentParser(
+        description="Reproduce TerraScout demo artifacts and benchmarks."
+    )
     parser.add_argument("--artifacts-dir", type=Path, default=Path("artifacts"))
     parser.add_argument("--seed", type=int, default=7)
     parser.add_argument("--skip-gif", action="store_true", help="Skip animated GIF generation.")

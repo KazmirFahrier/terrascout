@@ -1,0 +1,5 @@
+scenario,planner,pose_source,runs,mean_success_rate,total_collisions,mean_localization_error_m,mean_wall_time_s,max_scheduler_drops
+grid_truth,grid,truth,3,0.6666666666666666,1,0.0,5.15429902800012,0
+grid_particle,grid,particle,3,0.6666666666666666,1,0.05871238788979416,5.265734221999689,0
+grid_slam_clear,grid,slam,3,0.9523809523809524,0,0.11323023169249925,7.393591986333074,0
+hybrid_slam_clear,hybrid,slam,3,1.0,0,0.0808927012836879,8.27469565300089,0

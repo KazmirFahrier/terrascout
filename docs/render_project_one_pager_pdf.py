@@ -15,7 +15,7 @@ SOURCE = DOCS_DIR / "PROJECT_ONE_PAGER.md"
 OUTPUT = DOCS_DIR / "PROJECT_ONE_PAGER.pdf"
 PDF_METADATA = {
     "Title": "TerraScout One-Pager",
-    "Author": "TerraScout",
+    "Author": "Kazmir Fahrier",
     "Creator": "docs/render_project_one_pager_pdf.py",
     "Producer": "matplotlib",
     "CreationDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
@@ -36,7 +36,7 @@ def render_one_pager(source: Path = SOURCE, output: Path = OUTPUT) -> Path:
         fig.text(
             0.06,
             0.925,
-            "Modular autonomy stack for a GPS-degraded orchard inspection rover",
+            "Robotics software simulation by Kazmir Fahrier",
             fontsize=10.5,
             color="#333333",
             va="top",
@@ -48,7 +48,7 @@ def render_one_pager(source: Path = SOURCE, output: Path = OUTPUT) -> Path:
         _draw_text_block(fig, 0.06, 0.205, "Reproduce", sections["reproduce"], width=88, lines=5)
         _draw_text_block(fig, 0.06, 0.105, "Current Roadmap", sections["roadmap"], width=88, lines=4)
 
-        pdf.savefig(fig, bbox_inches="tight")
+        pdf.savefig(fig)
         plt.close(fig)
     return output
 
@@ -87,7 +87,7 @@ def _parse_sections(markdown: str) -> dict[str, list[str]]:
             continue
         if in_code:
             sections[current].append(line)
-        elif line.startswith("|") or line.startswith("-") or current == "summary":
+        elif line.startswith("|") or line.startswith(("-", "*")) or current == "summary":
             sections[current].append(line)
     return sections
 
@@ -103,7 +103,10 @@ def _draw_text_block(
 ) -> None:
     fig.text(x, y, title, fontsize=12, fontweight="bold", va="top")
     text = " ".join(_clean_line(line) for line in content)
-    wrapped = textwrap.wrap(text, width=width)[:lines]
+    wrapped = ([part for line in content for part in textwrap.wrap(_clean_line(line), width=width)]
+               if title == "Reproduce" else textwrap.wrap(text, width=width))
+    if len(wrapped) > lines:
+        raise ValueError(f"{title} exceeds the allotted text area")
     for idx, line in enumerate(wrapped):
         fig.text(x, y - 0.027 * (idx + 1), line, fontsize=8.5, va="top")
 
@@ -122,7 +125,7 @@ def _draw_stack(fig: plt.Figure, rows: list[str]) -> None:
 
 
 def _draw_metrics(fig: plt.Figure, rows: list[str]) -> None:
-    fig.text(0.06, 0.47, "Headline Metrics", fontsize=12, fontweight="bold", va="top")
+    fig.text(0.06, 0.47, "Evidence and Scope", fontsize=12, fontweight="bold", va="top")
     y = 0.443
     metrics = [_table_cells(row) for row in rows]
     selected = [
@@ -130,17 +133,7 @@ def _draw_metrics(fig: plt.Figure, rows: list[str]) -> None:
         for cells in metrics
         if len(cells) == 2
         and cells[0] not in {"Metric"}
-        and cells[0]
-        in {
-            "Mission inspection success",
-            "Collision events",
-            "Particle-filter relocalization",
-            "Resource scheduler oracle gap",
-            "Hybrid A* steering effort",
-            "EKF-SLAM map accuracy",
-            "30-row acceptance pass",
-            "30-row wall time",
-        }
+
     ]
     for metric, value in selected:
         fig.text(0.06, y, metric, fontsize=8, va="top")
@@ -149,7 +142,7 @@ def _draw_metrics(fig: plt.Figure, rows: list[str]) -> None:
 
 
 def _clean_line(line: str) -> str:
-    if line.startswith("- "):
+    if line.startswith(("- ", "* ")):
         return line[2:]
     return line.replace("`", "")
 

@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terrascout"
-version = "0.1.0"
+version = "0.2.0"
 description = "A compact autonomy demo for a crop-inspection rover in GPS-degraded orchards."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Kazmir Fahrier" }]
 dependencies = [
-  "numpy>=1.26",
-  "matplotlib>=3.8",
+  "numpy>=1.26,<3",
+  "matplotlib>=3.8,<4",
 ]
 
 [project.optional-dependencies]

@@ -49,19 +49,27 @@ class DriveController:
     def default(cls) -> "DriveController":
         return cls(
             heading_pid=PID(kp=2.95, ki=0.0, kd=0.05, integral_limit=0.5),
-            speed_pid=PID(kp=1.2, ki=0.05, kd=0.02, integral_limit=1.0),
+            speed_pid=PID(kp=0.3, ki=0.05, kd=0.0, integral_limit=1.0),
         )
 
-    def wheel_commands(self, pose: Pose2D, waypoint: Point2D, dt: float) -> tuple[float, float]:
+    def wheel_commands(
+        self, pose: Pose2D, waypoint: Point2D, dt: float, measured_speed_mps: float = 0.0
+    ) -> tuple[float, float]:
         """Compute differential wheel commands for the next waypoint."""
 
         dist = distance(pose, waypoint)
         target_heading = atan2(waypoint.y - pose.y, waypoint.x - pose.x)
         heading_error = wrap_angle(target_heading - pose.theta)
         target_speed = min(self.cruise_speed_mps, self.cruise_speed_mps * dist / self.slow_radius_m)
-        if abs(heading_error) > 1.2:
-            target_speed *= 0.25
-        linear = self.speed_pid.update(target_speed, dt)
+        # Rotate before translating to avoid cutting corners at sparse waypoints.
+        if abs(heading_error) > 0.3:
+            target_speed = 0.0
+            self.speed_pid.reset()
+        linear = max(
+            0.0, target_speed + self.speed_pid.update(target_speed - measured_speed_mps, dt)
+        )
+        if target_speed == 0.0:
+            linear = 0.0
         angular = self.heading_pid.update(heading_error, dt)
 
         left = linear - 0.5 * angular * self.wheel_base_m

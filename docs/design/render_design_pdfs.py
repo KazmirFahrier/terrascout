@@ -16,11 +16,11 @@ PAGE_WIDTH_IN = 8.5
 PAGE_HEIGHT_IN = 11.0
 LEFT = 0.08
 TOP = 0.94
-LINE_HEIGHT = 0.022
+LINE_HEIGHT = 0.021
 CHARS_PER_LINE = 92
 PDF_METADATA = {
     "Title": "TerraScout Design Note",
-    "Author": "TerraScout",
+    "Author": "Kazmir Fahrier",
     "Creator": "docs/design/render_design_pdfs.py",
     "Producer": "matplotlib",
     "CreationDate": datetime(2026, 1, 1, tzinfo=timezone.utc),
@@ -49,7 +49,8 @@ def render_markdown(source: Path, output: Path) -> None:
         y = TOP
         for style, line in lines:
             needed = LINE_HEIGHT * (1.45 if style == "h1" else 1.0)
-            if y - needed < 0.06:
+            reserve = 3 * LINE_HEIGHT if style in {"h1", "h2"} else 0.0
+            if y - needed - reserve < 0.06:
                 _write_page(pdf, page_lines)
                 page_lines = []
                 y = TOP
@@ -113,7 +114,7 @@ def _write_page(pdf: PdfPages, lines: list[tuple[str, str]]) -> None:
             family = "DejaVu Sans"
         fig.text(LEFT, y, line, fontsize=size, fontweight=weight, family=family, va="top")
         y -= LINE_HEIGHT * (1.45 if style == "h1" else 1.0)
-    pdf.savefig(fig, bbox_inches="tight")
+    pdf.savefig(fig)
     plt.close(fig)
 
 

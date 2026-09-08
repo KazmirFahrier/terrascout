@@ -10,5 +10,6 @@ dist/
 build/
 *.egg-info/
 .venv/
+.venv-*/
 artifacts/
 

@@ -18,6 +18,7 @@ class SafetySupervisorTest(unittest.TestCase):
             left_mps=1.0,
             right_mps=1.0,
             worker_detections=[LidarDetection(0.5, 0.0, "worker")],
+            observation_age_s=0.0,
             predicted_workers=[],
         )
 
@@ -33,6 +34,7 @@ class SafetySupervisorTest(unittest.TestCase):
             left_mps=1.0,
             right_mps=1.0,
             worker_detections=[],
+            observation_age_s=0.0,
             predicted_workers=[(1, 2.0, 0.0)],
         )
 
@@ -49,6 +51,7 @@ class SafetySupervisorTest(unittest.TestCase):
             left_mps=0.8,
             right_mps=0.7,
             worker_detections=[],
+            observation_age_s=0.0,
             predicted_workers=[(1, 5.0, 0.0)],
         )
 

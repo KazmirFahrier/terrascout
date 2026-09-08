@@ -23,7 +23,10 @@ class MissionTest(unittest.TestCase):
         self.assertGreater(metrics.daylight_remaining_s, 0.0)
         self.assertGreater(metrics.battery_soc_final, 0.8)
         self.assertLessEqual(metrics.battery_soc_min, metrics.battery_soc_final)
-        self.assertGreaterEqual(metrics.recharge_events, 1)
+        self.assertEqual(metrics.recharge_events, 0)
+        self.assertEqual(metrics.status, "completed")
+        self.assertEqual(metrics.pose_source, "particle")
+        self.assertEqual(metrics.mean_localization_error_m, metrics.particle_localization_error_m)
         self.assertGreater(metrics.min_worker_clearance_m, 0.0)
         self.assertTrue(
             metrics.safety_interventions > 0 or metrics.min_worker_clearance_m >= 2.4
